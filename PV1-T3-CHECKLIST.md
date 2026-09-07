@@ -10,6 +10,11 @@ Status: `in_progress`
 | Optional Assistant, endpoint, participant, and audience identities stay independently bound | `pass` | `src/gateway/gateway-service.js`; `test/gateway-service.test.js` — audience identity binding |
 | Read-only context and evidence operations | `pass` | `test/gateway-service.test.js` |
 | Prepared inputs and bounded grant view | `pass` | `src/gateway/gateway-service.js`; `test/gateway-service.test.js` |
+| Prepared inputs enforce item and byte bounds | `pass` | `src/gateway/gateway-service.js`; `test/gateway-service.test.js` |
+| Context queries enforce detail and response byte bounds | `pass` | `src/gateway/gateway-service.js`; `test/gateway-service.test.js` |
+| Bounded history continuation uses a source-bound cursor | `pass` | `src/domain/query-service.js`; `test/gateway-service.test.js` |
+| Namespaced trace custody preserves gateway provenance without interpretation | `pass` | `src/gateway/gateway-service.js`; `test/gateway-service.test.js` |
+| Fixture Agent validates complete profile compatibility metadata | `pass` | `src/agent/fixture-external-agent.js`; `test/gateway-http.test.js` |
 | Profile mismatch, expiry, and cross-site denial | `pass` | `test/gateway-service.test.js` |
 | No-effect capability snapshot is explicit | `pass` | `test/gateway-service.test.js` |
 | Authenticated HTTP transport binding issues authority and delegates gateway requests | `pass` | `src/http/gateway-server.js`; `test/gateway-http.test.js` |
