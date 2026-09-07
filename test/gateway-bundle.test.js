@@ -19,6 +19,9 @@ test("published gateway profile digest matches the checked-in bundle artifacts",
   const catalog = JSON.parse(await readFile(paths[0], "utf8"));
   const catalogDigest = createHash("sha256").update(JSON.stringify(catalog.operations)).digest("hex");
   const clientDigest = createHash("sha256").update(await readFile("src/gateway/generated-client.js")).digest("hex");
+  for (const artifact of manifest.artifacts) {
+    assert.equal(createHash("sha256").update(await readFile(artifact.path)).digest("hex"), artifact.sha256, `${artifact.path} artifact pin`);
+  }
   assert.equal(gatewayProfile.schemaStatus, "published");
   assert.equal(gatewayProfile.schemaDigest, digest.digest("hex"));
   assert.equal(gatewayBundle.bundleDigest, gatewayProfile.schemaDigest);
