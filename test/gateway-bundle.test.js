@@ -10,7 +10,8 @@ test("published gateway profile digest matches the checked-in bundle artifacts",
     "contracts/gateway/operation-catalog.json",
     "contracts/gateway/pwce-agent-gateway-profile.schema.json",
     "contracts/gateway/pwce-agent-gateway-request.schema.json",
-    "contracts/gateway/pwce-agent-gateway-response.schema.json"
+    "contracts/gateway/pwce-agent-gateway-response.schema.json",
+    "contracts/gateway/pwce-lifestream-compatibility-lock.schema.json"
   ];
   const digest = createHash("sha256");
   for (const path of paths) { digest.update(path); digest.update("\0"); digest.update(await readFile(path)); }
