@@ -52,7 +52,7 @@ export class PwceAgentGatewayClient {
     return this.#profilePromise;
   }
 
-  authority(payload, options) { return this.#json("/gateway/v1/authority", { ...options, method: "POST", body: payload }); }
+  async authority(payload, options) { await this.#ensureProfile(options); return this.#json("/gateway/v1/authority", { ...options, method: "POST", body: payload }); }
 
   async request(payload, options) { await this.#ensureProfile(options); return this.#json("/gateway/v1/request", { ...options, method: "POST", body: payload }); }
 
