@@ -449,4 +449,7 @@ export class GatewayService {
   }
 }
 
-export const gatewayProfile = Object.freeze({ profileId: PROFILE_ID, profileVersion: PROFILE_VERSION, operationCatalogVersion: "0.1.0", operationCatalogDigest: catalogDigest, compatibilityRange: { minimum: PROFILE_VERSION, maximum: "1.x" }, fixtures: [{ fixtureSetId: "pwce.shared.contract.vectors", fixtureSetVersion: "0.1.0", status: "draft" }], health: { status: "development", custody: "bounded" }, operationCatalog });
+// The exact gateway JSON schemas are still an open decision in the profile spec.
+// Advertise that boundary explicitly instead of hashing unrelated record
+// schemas or pretending the development response shapes are final.
+export const gatewayProfile = Object.freeze({ profileId: PROFILE_ID, profileVersion: PROFILE_VERSION, schemaStatus: "unpublished", schemaDigest: null, operationCatalogVersion: "0.1.0", operationCatalogDigest: catalogDigest, compatibilityRange: { minimum: PROFILE_VERSION, maximum: "1.x" }, fixtures: [{ fixtureSetId: "pwce.shared.contract.vectors", fixtureSetVersion: "0.1.0", status: "draft" }], health: { status: "development", custody: "bounded" }, operationCatalog });

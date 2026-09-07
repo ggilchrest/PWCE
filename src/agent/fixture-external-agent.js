@@ -48,6 +48,8 @@ export class FixtureExternalAgent {
     const catalog = new Set((profile.operationCatalog ?? []).map((entry) => entry.operation));
     const compatible = profile.profileId === fixtureGatewayProfile.profileId
       && profile.profileVersion === fixtureGatewayProfile.profileVersion
+      && profile.schemaStatus === fixtureGatewayProfile.schemaStatus
+      && profile.schemaDigest === fixtureGatewayProfile.schemaDigest
       && profile.operationCatalogVersion === fixtureGatewayProfile.operationCatalogVersion
       && profile.operationCatalogDigest === fixtureGatewayProfile.operationCatalogDigest
       && profile.compatibilityRange?.minimum === fixtureGatewayProfile.profileVersion
