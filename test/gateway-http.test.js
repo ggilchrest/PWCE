@@ -45,7 +45,7 @@ test("authenticated gateway HTTP binding issues authority and delegates requests
 test("fixture external Agent uses only the gateway HTTP contract", async () => {
   const calls = [];
   const responses = [
-    { ok: true, value: { profileId: "pwce-agent-gateway.v1", profileVersion: "1.0.0", operationCatalogVersion: "0.1.0", operationCatalogDigest: "445cb4e4b9811a26a41c5821c7d68b09f377b69d24d42ec6dcd0acec5d950b65", operationCatalog: [{ operation: "context.query" }, { operation: "authority.getGrants" }, { operation: "health.get" }] } },
+    { ok: true, value: { profileId: "pwce-agent-gateway.v1", profileVersion: "1.0.0", operationCatalogVersion: "0.1.0", operationCatalogDigest: "445cb4e4b9811a26a41c5821c7d68b09f377b69d24d42ec6dcd0acec5d950b65", compatibilityRange: { minimum: "1.0.0", maximum: "1.x" }, health: { status: "development" }, fixtures: [{ fixtureSetId: "pwce.shared.contract.vectors", fixtureSetVersion: "0.1.0" }], operationCatalog: [{ operation: "context.query" }, { operation: "authority.getGrants" }, { operation: "health.get" }] } },
     { ok: true, value: { authorityContextRef: "authority.fixture", expiresAt: "2026-09-07T12:05:00Z", siteRefs: ["home.one"] } },
     { ok: true, value: { status: "known", value: 21, evidenceRefs: ["evidence.fixture"], limitations: [] } }
   ];
@@ -63,5 +63,10 @@ test("fixture external Agent fails closed on a catalog digest mismatch", async (
     token: "gateway-test-token",
     fetchImpl: async () => new Response(JSON.stringify({ profileId: "pwce-agent-gateway.v1", profileVersion: "1.0.0", operationCatalogVersion: "0.1.0", operationCatalogDigest: "wrong", operationCatalog: [{ operation: "context.query" }, { operation: "authority.getGrants" }, { operation: "health.get" }] }), { status: 200, headers: { "content-type": "application/json" } })
   });
+  await assert.rejects(() => agent.profile(), { code: "incompatible_gateway_profile" });
+});
+
+test("fixture external Agent fails closed when compatibility metadata is incomplete", async () => {
+  const agent = new FixtureExternalAgent({ baseUrl: "http://pwce.local", token: "gateway-test-token", fetchImpl: async () => new Response(JSON.stringify({ profileId: "pwce-agent-gateway.v1", profileVersion: "1.0.0", operationCatalogVersion: "0.1.0", operationCatalogDigest: "445cb4e4b9811a26a41c5821c7d68b09f377b69d24d42ec6dcd0acec5d950b65", operationCatalog: [{ operation: "context.query" }, { operation: "authority.getGrants" }, { operation: "health.get" }] }), { status: 200, headers: { "content-type": "application/json" } }) });
   await assert.rejects(() => agent.profile(), { code: "incompatible_gateway_profile" });
 });

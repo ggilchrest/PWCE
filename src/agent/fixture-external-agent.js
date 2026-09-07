@@ -50,6 +50,10 @@ export class FixtureExternalAgent {
       && profile.profileVersion === fixtureGatewayProfile.profileVersion
       && profile.operationCatalogVersion === fixtureGatewayProfile.operationCatalogVersion
       && profile.operationCatalogDigest === fixtureGatewayProfile.operationCatalogDigest
+      && profile.compatibilityRange?.minimum === fixtureGatewayProfile.profileVersion
+      && typeof profile.compatibilityRange?.maximum === "string"
+      && profile.health && typeof profile.health.status === "string"
+      && profile.fixtures?.some((fixture) => fixture.fixtureSetId === fixtureGatewayProfile.fixtureSetId && fixture.fixtureSetVersion === fixtureGatewayProfile.fixtureSetVersion)
       && fixtureGatewayProfile.requiredOperations.every((operation) => catalog.has(operation));
     if (!compatible) throw fail("incompatible gateway profile", "incompatible_gateway_profile");
     return profile;
