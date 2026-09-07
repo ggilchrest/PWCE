@@ -7,7 +7,9 @@ PWCE now has a fail-closed validator for the small cross-repository compatibilit
 ## Evidence
 
 - `src/gateway/compatibility-lock.js` validates the lock and rejects unpublished schemas.
+- `scripts/validate-pwce-compatibility-lock.mjs` provides the command-line validation entry point.
 - `test/compatibility-lock.test.js` covers the unpublished-schema and missing-evidence failures.
+- `test/compatibility-lock-cli.test.js` covers missing and unreadable lock input.
 - `npm test` — expected to pass after this slice.
 
 ## Boundary
