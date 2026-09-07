@@ -47,6 +47,11 @@ export class PwceAgentGatewayClient {
     return profile;
   }
 
+  async bundle(options) {
+    await this.#ensureProfile(options);
+    return this.#json("/gateway/v1/bundle", options);
+  }
+
   async #ensureProfile(options) {
     this.#profilePromise ??= this.profile(options).catch((error) => { this.#profilePromise = null; throw error; });
     return this.#profilePromise;

@@ -29,6 +29,10 @@ test("authenticated gateway HTTP binding issues authority and delegates requests
   assert.match(profile.value.schemaDigest, /^[a-f0-9]{64}$/);
   assert.equal(profile.value.bundleId, "pwce-agent-gateway.bundle.v1");
   assert.equal(profile.value.bundleVersion, "1.0.0");
+  const bundle = await invoke(binding, { pathname: "/gateway/v1/bundle", authorization: "Bearer gateway-test-token" });
+  assert.equal(bundle.status, 200);
+  assert.equal(bundle.value.bundleDigest, profile.value.schemaDigest);
+  assert.equal(bundle.value.generatedClient.path, "src/gateway/generated-client.js");
   assert.equal(profile.value.health.status, "development");
   assert.equal(profile.value.compatibilityRange.minimum, "1.0.0");
   const authorityResponse = await invoke(binding, { pathname: "/gateway/v1/authority", method: "POST", authorization: "Bearer gateway-test-token", payload: { siteRefs: ["home.one"] } });

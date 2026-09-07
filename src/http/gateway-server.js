@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { GatewayService, gatewayProfile } from "../gateway/gateway-service.js";
+import { gatewayBundle } from "../gateway/gateway-bundle.js";
 
 function json(res, status, value) {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
@@ -47,6 +48,10 @@ export function createGatewayHttpBinding({ store, token, principalRef = "agent.f
       if (req.method === "GET" && pathname === "/gateway/v1/profile") {
         if (!sameSecret(presentedToken, token)) { json(res, 401, { error: "authentication_failed" }); return true; }
         return json(res, 200, gatewayProfile), true;
+      }
+      if (req.method === "GET" && pathname === "/gateway/v1/bundle") {
+        if (!sameSecret(presentedToken, token)) { json(res, 401, { error: "authentication_failed" }); return true; }
+        return json(res, 200, gatewayBundle), true;
       }
       if (req.method === "GET" && pathname === "/gateway/v1/events") {
         try {
