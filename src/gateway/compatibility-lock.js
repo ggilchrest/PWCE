@@ -18,10 +18,22 @@ function validateProfile(lockProfile, expected, path, errors) {
   if (lockProfile.profileId !== expected.profileId) errors.push(`${path}.profileId does not match the selected PWCE profile`);
   requiredString(lockProfile.profileVersion, `${path}.profileVersion`, errors);
   if (expected.profileVersion && lockProfile.profileVersion !== expected.profileVersion) errors.push(`${path}.profileVersion does not match the selected PWCE profile`);
+  if (expected.bundleId) {
+    if (lockProfile.bundleId !== expected.bundleId) errors.push(`${path}.bundleId does not match the selected PWCE profile`);
+    if (lockProfile.bundleVersion !== expected.bundleVersion) errors.push(`${path}.bundleVersion does not match the selected PWCE profile`);
+  }
   if (lockProfile.schemaStatus !== "published") errors.push(`${path}.schemaStatus is not published`);
   requiredString(lockProfile.schemaDigest, `${path}.schemaDigest`, errors);
   requiredString(lockProfile.operationCatalogDigest, `${path}.operationCatalogDigest`, errors);
   requiredArray(lockProfile.fixtures, `${path}.fixtures`, errors);
+  if (expected.schemaDigest && lockProfile.schemaDigest !== expected.schemaDigest) errors.push(`${path}.schemaDigest does not match the selected PWCE profile`);
+  if (expected.operationCatalogDigest && lockProfile.operationCatalogDigest !== expected.operationCatalogDigest) errors.push(`${path}.operationCatalogDigest does not match the selected PWCE profile`);
+  if (expected.fixtures?.[0]) {
+    const expectedFixture = expected.fixtures[0];
+    const actualFixture = lockProfile.fixtures?.find((fixture) => fixture.fixtureSetId === expectedFixture.fixtureSetId && fixture.fixtureSetVersion === expectedFixture.fixtureSetVersion);
+    if (!actualFixture) errors.push(`${path}.fixtures does not include the selected fixture set`);
+    else if (actualFixture.status !== expectedFixture.status) errors.push(`${path}.fixtures selected fixture status does not match the published profile`);
+  }
 }
 
 export function validateCompatibilityLock(lock) {

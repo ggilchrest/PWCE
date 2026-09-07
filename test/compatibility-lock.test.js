@@ -6,7 +6,7 @@ function draftLock() {
   return {
     lockVersion: "0.1.0",
     pwceBundle: { bundleId: "pwce-agent-gateway.bundle.v1", bundleVersion: "1.0.0", bundleDigest: "2eb0c47b65cc254edf09b2893fab1eb36e00142eb361649798bec65c2f08fe11" },
-    pwceProfile: { profileId: "pwce-agent-gateway.v1", profileVersion: "1.0.0", schemaDigest: "pwce-schema", operationCatalogDigest: "pwce-catalog", fixtures: ["pwce-fixtures"] },
+    pwceProfile: { profileId: "pwce-agent-gateway.v1", profileVersion: "1.0.0", bundleId: "pwce-agent-gateway.bundle.v1", bundleVersion: "1.0.0", schemaStatus: "published", schemaDigest: "2eb0c47b65cc254edf09b2893fab1eb36e00142eb361649798bec65c2f08fe11", operationCatalogDigest: "445cb4e4b9811a26a41c5821c7d68b09f377b69d24d42ec6dcd0acec5d950b65", fixtures: [{ fixtureSetId: "pwce.shared.contract.vectors", fixtureSetVersion: "0.1.0", status: "published" }] },
     lifestreamProfile: { profileId: "lifestream-pwce.v1", profileVersion: "1.0.0", schemaStatus: "unpublished", schemaDigest: "lifestream-schema", operationCatalogDigest: "lifestream-catalog", fixtures: ["lifestream-fixtures"] },
     adapterRevision: "adapter-rev",
     environment: "development",
@@ -29,4 +29,11 @@ test("compatibility lock reports missing cross-repository evidence", () => {
   assert.ok(errors.some((error) => error.startsWith("lifestreamProfile.schemaDigest")));
   assert.ok(errors.includes("adapterRevision must be a non-empty string"));
   assert.ok(errors.includes("results must be a non-empty array"));
+});
+
+test("compatibility lock rejects a PWCE digest that is merely well-formed", () => {
+  const lock = draftLock();
+  lock.pwceProfile.schemaDigest = "f".repeat(64);
+  const errors = validateCompatibilityLock(lock);
+  assert.ok(errors.includes("pwceProfile.schemaDigest does not match the selected PWCE profile"));
 });
