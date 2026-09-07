@@ -5,6 +5,7 @@
   "bundleVersion": "1.0.0",
   "profileId": "pwce-agent-gateway.v1",
   "profileVersion": "1.0.0",
+  "bundleDigest": "3af96275bc26754a8cebc64febb10b5ca50c951fd5003f106e06cfda846d4d3b",
   "digestAlgorithm": "sha256-ordered-path-bytes-v1",
   "artifacts": [
     { "path": "contracts/gateway/operation-catalog.json", "sha256": "51bfb941913fc27578dc3c4b3ca038d4bfdf4433eda72f2069173503e7b19a0c" },

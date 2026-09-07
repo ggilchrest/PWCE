@@ -22,6 +22,10 @@ test("published gateway profile digest matches the checked-in bundle artifacts",
   assert.equal(gatewayProfile.schemaStatus, "published");
   assert.equal(gatewayProfile.schemaDigest, digest.digest("hex"));
   assert.equal(gatewayBundle.bundleDigest, gatewayProfile.schemaDigest);
+  assert.equal(manifest.bundleId, gatewayBundle.bundleId);
+  assert.equal(manifest.bundleVersion, gatewayBundle.bundleVersion);
+  assert.equal(manifest.bundleDigest, gatewayBundle.bundleDigest);
+  assert.deepEqual(manifest.artifacts, gatewayBundle.artifacts);
   assert.equal(gatewayProfile.operationCatalogDigest, catalogDigest);
   assert.equal(manifest.generatedClient.sha256, clientDigest);
 });
