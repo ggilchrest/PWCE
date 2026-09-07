@@ -8,9 +8,9 @@
   "digestAlgorithm": "sha256-ordered-path-bytes-v1",
   "artifacts": [
     { "path": "contracts/gateway/operation-catalog.json", "sha256": "51bfb941913fc27578dc3c4b3ca038d4bfdf4433eda72f2069173503e7b19a0c" },
-    { "path": "contracts/gateway/pwce-agent-gateway-profile.schema.json", "sha256": "975e7fb80361075068d654592352ebf02c638d61a38f18f5130d62d49ce1d88c" },
+    { "path": "contracts/gateway/pwce-agent-gateway-profile.schema.json", "sha256": "268a4e670ba9b32457725944c87ec46fda7dda821dc2f48fc5d8ff022f434e36" },
     { "path": "contracts/gateway/pwce-agent-gateway-request.schema.json", "sha256": "56fdd84719ddbe6d5d2a9644e9079b25df2e719dcbf0a9e33b3bf16d79760175" },
     { "path": "contracts/gateway/pwce-agent-gateway-response.schema.json", "sha256": "06fc6a9635c192329d43723f596330a336f1f3e57edd05e7d634110ebbb6f9ae" }
   ],
-  "generatedClient": { "path": "src/gateway/generated-client.js", "status": "checked_in", "sha256": "7920cc28cd58899142b7bdf35bc38669df7dad07fda38558af8e52d729f0947a" }
+  "generatedClient": { "path": "src/gateway/generated-client.js", "status": "checked_in", "sha256": "b8464f1d34cfe146c210be76aadf342028dd0fa29636e5293a46037bad137d3c" }
 }

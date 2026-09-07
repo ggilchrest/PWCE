@@ -71,4 +71,46 @@ export class PwceAgentGatewayClient {
     const params = new URLSearchParams({ authorityContextRef, siteRef, afterCursor, limit: String(limit) });
     return `${this.#baseUrl}/gateway/v1/events?${params}`;
   }
+
+  async *subscribeInvalidations({ authorityContextRef, siteRef, afterCursor = "0", limit = 100, signal } = {}) {
+    await this.#ensureProfile({ signal });
+    const response = await this.#fetch(this.eventsUrl({ authorityContextRef, siteRef, afterCursor, limit }), { method: "GET", signal, headers: { Authorization: `Bearer ${this.#token}`, Accept: "text/event-stream" } });
+    if (!response.ok || !response.body) {
+      const error = new Error(`gateway event stream failed with status ${response.status}`);
+      error.code = "gateway_stream_failed";
+      throw error;
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let event = { data: [] };
+    const emit = () => {
+      if (!event.data.length) return null;
+      const value = { id: event.id ?? null, event: event.event ?? "message", data: event.data.join("\n") };
+      event = { data: [] };
+      return value;
+    };
+    try {
+      while (true) {
+        const chunk = await reader.read();
+        buffer += decoder.decode(chunk.value ?? new Uint8Array(), { stream: !chunk.done });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const rawLine of lines) {
+          const line = rawLine.endsWith("\r") ? rawLine.slice(0, -1) : rawLine;
+          if (!line) { const parsed = emit(); if (parsed) yield parsed; continue; }
+          if (line.startsWith(":")) continue;
+          const separator = line.indexOf(":");
+          const field = separator < 0 ? line : line.slice(0, separator);
+          const value = separator < 0 ? "" : line.slice(separator + 1).replace(/^ /, "");
+          if (field === "id") event.id = value;
+          else if (field === "event") event.event = value;
+          else if (field === "data") event.data.push(value);
+        }
+        if (chunk.done) { const parsed = emit(); if (parsed) yield parsed; break; }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
 }

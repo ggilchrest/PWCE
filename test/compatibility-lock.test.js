@@ -5,7 +5,7 @@ import { assertCompatibilityLock, validateCompatibilityLock } from "../src/gatew
 function draftLock() {
   return {
     lockVersion: "0.1.0",
-    pwceBundle: { bundleId: "pwce-agent-gateway.bundle.v1", bundleVersion: "1.0.0", bundleDigest: "b3e3d12384c17a2e659f0b66504d8cc226673bd2bc25bf135fdbe58fb8909717" },
+    pwceBundle: { bundleId: "pwce-agent-gateway.bundle.v1", bundleVersion: "1.0.0", bundleDigest: "2eb0c47b65cc254edf09b2893fab1eb36e00142eb361649798bec65c2f08fe11" },
     pwceProfile: { profileId: "pwce-agent-gateway.v1", profileVersion: "1.0.0", schemaDigest: "pwce-schema", operationCatalogDigest: "pwce-catalog", fixtures: ["pwce-fixtures"] },
     lifestreamProfile: { profileId: "lifestream-pwce.v1", profileVersion: "1.0.0", schemaStatus: "unpublished", schemaDigest: "lifestream-schema", operationCatalogDigest: "lifestream-catalog", fixtures: ["lifestream-fixtures"] },
     adapterRevision: "adapter-rev",
