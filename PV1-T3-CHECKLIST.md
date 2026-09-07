@@ -15,7 +15,7 @@ Status: `in_progress`
 | Bounded history continuation uses a source-bound cursor | `pass` | `src/domain/query-service.js`; `test/gateway-service.test.js` |
 | Namespaced trace custody preserves gateway provenance without interpretation | `pass` | `src/gateway/gateway-service.js`; `test/gateway-service.test.js` |
 | Development fixture Agent validates the available profile compatibility metadata | `pass` | `src/agent/fixture-external-agent.js`; `test/gateway-http.test.js` |
-| Final gateway JSON schema publication and digest | `deferred` | Exact gateway field names and schema identifiers remain an open decision in Section 22 of `PWCE_PERSONAL_V1_AGENT_GATEWAY_PROFILE.md`; the profile reports `schemaStatus: unpublished` and does not claim a digest |
+| Final gateway JSON schema publication and digest | `pass` | `contracts/gateway/bundle-manifest.json`; `test/gateway-bundle.test.js` — published profile/request/response schemas and reproducible bundle digest |
 | Profile mismatch, expiry, and cross-site denial | `pass` | `test/gateway-service.test.js` |
 | No-effect capability snapshot is explicit | `pass` | `test/gateway-service.test.js` |
 | Authenticated HTTP transport binding issues authority and delegates gateway requests | `pass` | `src/http/gateway-server.js`; `test/gateway-http.test.js` |

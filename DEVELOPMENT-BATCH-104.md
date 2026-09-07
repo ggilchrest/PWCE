@@ -8,6 +8,8 @@ The gateway and fixture Agent now advertise the bundle digest and published sche
 
 The compatibility gate now requires that lock files repeat the exact published PWCE bundle identity, version, and digest.
 
+The PV1-T3 checklist now records final PWCE schema publication as passed; only the separately owned Lifestream mapping remains deferred.
+
 ## Evidence
 
 - `contracts/gateway/bundle-manifest.json` records the bundle artifacts and file digests.
