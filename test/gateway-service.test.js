@@ -70,6 +70,13 @@ test("serves current context and evidence through the read-only gateway", async 
   assert.equal(current.knowledgeState, "current");
   assert.equal(current.basis, "observed");
   assert.ok(current.invalidationCursor);
+  const ageBound = await gateway.request({ operation: "context.query", mode: "current", siteRef: "home.one", externalEntityId: "sensor.temperature", property: "temperature", maxAgeMs: 1, authorityContextRef: context.authorityContextRef });
+  assert.equal(ageBound.status, "stale");
+  assert.equal(ageBound.freshnessAccepted, false);
+  assert.equal("value" in ageBound, false);
+  const staleAllowed = await gateway.request({ operation: "context.query", mode: "current", siteRef: "home.one", externalEntityId: "sensor.temperature", property: "temperature", maxAgeMs: 1, allowStale: true, authorityContextRef: context.authorityContextRef });
+  assert.equal(staleAllowed.value, 21);
+  assert.equal(staleAllowed.freshnessAccepted, false);
   const evidence = await gateway.request({ operation: "evidence.get", evidenceRef: current.evidenceRefs[0], authorityContextRef: context.authorityContextRef });
   assert.equal(evidence.evidence.payload.siteRef, "home.one");
   assert.equal(evidence.sourceRef, "ha.one");

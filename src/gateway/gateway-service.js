@@ -154,6 +154,8 @@ export class GatewayService {
     const detail = input.detail ?? "standard";
     if (!["summary", "standard", "evidence"].includes(detail)) throw fail("invalid_request", "context.query detail must be summary, standard, or evidence");
     if (input.maxBytes !== undefined && (!Number.isInteger(input.maxBytes) || input.maxBytes < 256 || input.maxBytes > 262144)) throw fail("invalid_request", "context.query maxBytes must be an integer from 256 to 262144");
+    if (input.maxAgeMs !== undefined && (!Number.isInteger(input.maxAgeMs) || input.maxAgeMs < 0 || input.maxAgeMs > 2_592_000_000)) throw fail("invalid_request", "context.query maxAgeMs must be an integer from 0 to 2592000000");
+    if (input.allowStale !== undefined && typeof input.allowStale !== "boolean") throw fail("invalid_request", "context.query allowStale must be boolean");
     const siteRefs = Array.isArray(input.siteRefs) ? [...new Set(input.siteRefs)] : siteRef ? [siteRef] : [];
     if (!mode || !siteRefs.length) throw fail("invalid_request", "context.query requires mode and site scope");
     if (siteRefs.length > 1 && siteRef !== undefined) throw fail("invalid_request", "context.query uses siteRefs instead of siteRef for multi-site queries");
@@ -186,9 +188,27 @@ export class GatewayService {
   }
 
   #boundedQueryResponse(input, result) {
-    const response = { ...result, detail: input.detail ?? "standard" };
+    const response = this.#applyFreshnessPolicy(input, { ...result, detail: input.detail ?? "standard" });
     if (input.maxBytes !== undefined && Buffer.byteLength(JSON.stringify(response), "utf8") > input.maxBytes) throw fail("limit_exceeded", "context.query response exceeds maxBytes");
     return response;
+  }
+
+  #applyFreshnessPolicy(input, result) {
+    if (input.maxAgeMs === undefined || !["current", "explain"].includes(input.mode)) return result;
+    const allowStale = input.allowStale === true;
+    const qualify = (item) => {
+      if (!item?.eventTime) return item;
+      const ageMs = Math.max(0, this.#clock().valueOf() - new Date(item.eventTime).valueOf());
+      if (ageMs <= input.maxAgeMs) return { ...item, freshnessAccepted: true };
+      const qualified = { ...item, status: "stale", knowledgeState: "stale", freshnessAccepted: false, limitations: [...(item.limitations ?? []), "The evidence exceeds the caller's maximum acceptable age."] };
+      if (!allowStale) { delete qualified.value; qualified.reason = "maximum_age_exceeded"; }
+      return qualified;
+    };
+    if (Array.isArray(result.items)) {
+      const items = result.items.map(qualify);
+      return { ...result, items, freshnessAccepted: items.every((item) => item.freshnessAccepted !== false), limitations: [...(result.limitations ?? []), ...(items.some((item) => item.freshnessAccepted === false) ? [allowStale ? "One or more items are stale under the caller's maximum acceptable age." : "One or more items exceed the caller's maximum acceptable age and their values were withheld."] : [])] };
+    }
+    return qualify(result);
   }
 
   async #aggregateCurrent(context, { siteRefs, externalEntityId, property }) {
