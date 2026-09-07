@@ -1,0 +1,88 @@
+import { timingSafeEqual } from "node:crypto";
+import { GatewayService, gatewayProfile } from "../gateway/gateway-service.js";
+
+function json(res, status, value) {
+  res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+  res.end(JSON.stringify(value));
+}
+
+async function body(req) {
+  let text = "";
+  for await (const chunk of req) text += chunk;
+  if (!text) return {};
+  try { return JSON.parse(text); } catch { throw new Error("request body must be valid JSON"); }
+}
+
+function bearer(req) {
+  return req.headers.authorization?.startsWith("Bearer ") ? req.headers.authorization.slice("Bearer ".length) : null;
+}
+
+function sameSecret(left, right) {
+  if (typeof left !== "string" || typeof right !== "string") return false;
+  const a = Buffer.from(left); const b = Buffer.from(right);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+function authError(error) {
+  return ["authentication_failed", "authority_context_expired", "authority_context_invalidated"].includes(error.code) || /authentication|authority context/i.test(error.message) ? 401 : 400;
+}
+
+function sse(res, result) {
+  res.writeHead(200, { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-store", connection: "keep-alive" });
+  const writeEvent = (event) => res.write(`id: ${event.cursor}\nevent: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+  if (result.resyncRequired) res.write("event: resync.required\ndata: {\"reason\":\"cursor_expired\"}\n\n");
+  for (const event of result.events) writeEvent(event);
+  res.write(": gateway-replay\n\n");
+  return writeEvent;
+}
+
+export function createGatewayHttpBinding({ store, token, principalRef = "agent.fixture", siteRefs = ["home.one"], actionService = null, gateway = new GatewayService({ store, actionService }) } = {}) {
+  if (token) gateway.registerPrincipal({ principalRef, token, siteRefs });
+  return {
+    gateway,
+    async handle(req, res, pathname) {
+      if (!pathname.startsWith("/gateway/v1/")) return false;
+      if (!token) { json(res, 503, { error: "gateway_token_not_configured" }); return true; }
+      const presentedToken = bearer(req);
+      if (req.method === "GET" && pathname === "/gateway/v1/profile") {
+        if (!sameSecret(presentedToken, token)) { json(res, 401, { error: "authentication_failed" }); return true; }
+        return json(res, 200, gatewayProfile), true;
+      }
+      if (req.method === "GET" && pathname === "/gateway/v1/events") {
+        try {
+          const url = new URL(req.url, "http://127.0.0.1");
+          const result = await gateway.requestAuthenticated({ token: presentedToken, operation: "events.subscribe", authorityContextRef: url.searchParams.get("authorityContextRef"), siteRef: url.searchParams.get("siteRef"), afterCursor: url.searchParams.get("afterCursor") ?? "0", limit: Number(url.searchParams.get("limit") ?? 100) });
+          const writeEvent = sse(res, result);
+          if (typeof req.on !== "function") { res.end(); return true; }
+          const afterCursor = result.nextCursor;
+          const close = gateway.openEventStream({ siteRef: result.siteRef, principalRef: result.principalRef, afterCursor, onEvent: writeEvent });
+          const timeout = setTimeout(() => { close(); res.end(); }, 30_000);
+          timeout.unref?.();
+          req.on("close", () => { clearTimeout(timeout); close(); });
+          return true;
+        } catch (error) {
+          json(res, authError(error), { error: { code: error.code ?? "gateway_request_failed", message: error.message } });
+          return true;
+        }
+      }
+      if (req.method !== "POST") { json(res, 405, { error: "method_not_allowed" }); return true; }
+      try {
+        if (pathname === "/gateway/v1/authority") {
+          if (!sameSecret(presentedToken, token)) throw new Error("authentication failed");
+          const payload = await body(req);
+          return json(res, 201, gateway.issueAuthorityContext({ principalRef, token: presentedToken, siteRefs: payload.siteRefs, ttlMs: payload.ttlMs })), true;
+        }
+        if (pathname === "/gateway/v1/request") {
+          const payload = await body(req);
+          const result = await gateway.requestAuthenticated({ token: presentedToken, ...payload });
+          return json(res, 200, result), true;
+        }
+        json(res, 404, { error: "gateway_route_not_found" });
+        return true;
+      } catch (error) {
+        json(res, authError(error), { error: { code: error.code ?? "gateway_request_failed", message: error.message } });
+        return true;
+      }
+    }
+  };
+}

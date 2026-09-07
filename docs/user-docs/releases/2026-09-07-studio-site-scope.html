@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Site-qualified Studio inspection — PWCE</title><link rel="stylesheet" href="../assets/docs.css"></head>
+<body><header class="doc-header"><a href="../manual/index.html">PWCE User Manual</a><span class="doc-meta">Release note · 2026-09-07</span></header><main>
+<h1>Site-qualified Studio inspection</h1>
+<p class="lede">PWCE Studio now lets you choose which authorized Home Assistant site you are inspecting.</p>
+<h2>Why it matters</h2><p>Two sites can contain entities with the same name. The selected site is now carried through current context, history, explanations, Agent questions, and action requests so PWCE does not silently combine them. When more than one site is authorized, “All authorized sites” provides a read-only comparison with one value per site; it never merges values or authorizes an aggregate action.</p>
+<h2>What to test</h2><ul><li><a href="../qa/inspect-local-context.html">QA: Inspect local context and request a safe action</a> — focus on the “Home site” selector and verify that changing it refreshes site-qualified evidence and history.</li></ul>
+<h2>Related documentation</h2><p>See <a href="../manual/inspect-local-context.html">Inspect local context and request a safe action</a>.</p>
+<h2>Screenshot</h2><p>The Studio overview screenshot was recaptured after adding the site selector.</p>
+</main><footer class="doc-footer">PWCE release notes · 2026-09-07</footer></body></html>

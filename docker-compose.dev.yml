@@ -1,0 +1,34 @@
+services:
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: pwce-homeassistant-dev
+    restart: unless-stopped
+    ports:
+      - "8123:8123"
+    environment:
+      TZ: ${TZ:-America/Chicago}
+    volumes:
+      - ./.dev/home-assistant:/config
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request, urllib.error;\ntry:\n urllib.request.urlopen('http://127.0.0.1:8123/api/', timeout=3)\nexcept urllib.error.HTTPError as error:\n raise SystemExit(0 if error.code == 401 else 1)\" "]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+  homeassistant-two:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: pwce-homeassistant-dev-two
+    profiles: ["multi-site"]
+    restart: unless-stopped
+    ports:
+      - "8124:8123"
+    environment:
+      TZ: ${TZ:-America/Chicago}
+    volumes:
+      - ./.dev/home-assistant-two:/config
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request, urllib.error;\ntry:\n urllib.request.urlopen('http://127.0.0.1:8123/api/', timeout=3)\nexcept urllib.error.HTTPError as error:\n raise SystemExit(0 if error.code == 401 else 1)\" "]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s

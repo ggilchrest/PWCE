@@ -1,0 +1,17 @@
+default_config:
+
+homeassistant:
+  name: PWCE Development Home
+  latitude: 41.8781
+  longitude: -87.6298
+  elevation: 181
+  unit_system: imperial
+  time_zone: America/Chicago
+  country: US
+
+demo:
+
+logger:
+  default: warning
+  logs:
+    homeassistant.components.demo: info

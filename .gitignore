@@ -1,2 +1,6 @@
 # Local-only PWCE planning material: prompts, notes, specifications, and stories.
 /.private/
+
+# Disposable local development state and credentials.
+/.dev/
+/.env

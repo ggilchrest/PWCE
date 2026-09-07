@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Inspect local context — PWCE</title><link rel="stylesheet" href="../assets/docs.css"></head>
+<body><header class="doc-header"><a href="index.html">PWCE User Manual</a><span class="doc-meta">Updated 2026-09-07</span></header><main>
+<h1>Inspect local context and request a safe action</h1>
+<p class="lede">Use this local development journey to see what PWCE knows, inspect its evidence, and prepare a reversible light action without claiming that it succeeded too early.</p>
+<h2>What you'll do here</h2>
+<p>You will open PWCE Studio, choose the Home Assistant site you want to inspect, check its connection state, review the latest observation, see whether it is known, stale, or conflicted, preview a brightness request, complete the local approval step, and explicitly dispatch the approved Action. The default setup keeps live effects disabled.</p>
+<h2>Before you start</h2>
+<ul><li>Set <code>PWCE_STUDIO_TOKEN</code> for direct API clients. The browser Studio creates its own local session.</li><li>Start the development server with <code>npm run dev</code>.</li><li>Open <code>http://127.0.0.1:4173/</code>.</li><li>For evidence, configure the local Home Assistant environment or use seeded development data.</li></ul>
+<h2>Walkthrough</h2>
+<ol class="steps">
+<li><p class="action">Open PWCE Studio.</p><p class="expect">You should see the “PWCE Studio” heading and a “Local development” badge.</p><figure><img src="../assets/screenshots/inspect-local-context/inspect-local-context-01-studio-overview.png" alt="PWCE Studio showing the Home site selector, local development status, current evidence, and the safe light action panel"><figcaption>PWCE Studio keeps site scope, runtime status, evidence, and controlled effects in one view.</figcaption></figure></li>
+<li><p class="action">Choose a site from “Home site”.</p><p class="expect">The current evidence, explanation, history, Agent question, and action request use the selected site. Site references remain visible so similarly named entities are not silently combined. If more than one site is authorized, “All authorized sites” shows one current value per site without merging them; choose one site for explanations, Agent questions, or actions.</p></li>
+<li><p class="action">Review the “Runtime” and “Current state” cards.</p><p class="expect">You should see whether the runtime is online, offline, or degraded, and whether the selected light state is Known, Stale, Conflicted, or Unknown.</p></li>
+<li><p class="action">Read the “Current evidence” panel.</p><p class="expect">You should see the entity, property, observation time, observation reference, and recent observations for the selected site.</p></li>
+<li><p class="action">Select <strong>Explain current state</strong>.</p><p class="expect">You should see the current knowledge state, source, observation time, evidence reference, and any freshness limitation.</p></li>
+<li><p class="action">Set “Target brightness” and select <strong>Preview request</strong>.</p><p class="expect">You should receive a decision before any approval or dispatch. The UI should not claim that a live effect happened.</p></li>
+<li><p class="action">If the preview requires approval, select <strong>Request approval</strong>, then <strong>Approve locally</strong>.</p><p class="expect">You should see the approval move through the Studio.</p></li>
+<li><p class="action">Select <strong>Dispatch approved action</strong>.</p><p class="expect">You should see the persisted Action status. A disabled live route is denied, and a service acknowledgement without independent state reconciliation remains <code>outcome_unknown</code>.</p></li>
+</ol>
+<h2>Tips &amp; troubleshooting</h2>
+<ul><li><strong>Runtime offline:</strong> check the Home Assistant URL and environment-backed token reference.</li><li><strong>Live connection interrupted:</strong> Studio reports degraded or offline and retries automatically with bounded backoff; review the reconnect settings in <code>.env.example</code> when testing recovery.</li><li><strong>Current state unknown:</strong> no accepted observation supports the selected entity yet.</li><li><strong>Live route not activated:</strong> set <code>PWCE_ENABLE_LIVE_EFFECTS=true</code> only in the disposable development environment when you are ready to test an approved reversible action.</li><li>The UI does not replace independent state reconciliation. An acknowledged service call is not the same as a verified result.</li></ul>
+<h2>Related journeys</h2><p>This is the first documented PWCE user journey. More journeys will be added as their flows become runnable.</p></main><footer class="doc-footer">PWCE User Manual · Last updated 2026-09-07</footer></body></html>

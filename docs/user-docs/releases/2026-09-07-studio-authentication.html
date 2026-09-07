@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Local Studio authentication — PWCE release notes</title><link rel="stylesheet" href="../assets/docs.css"></head>
+<body><header class="doc-header"><a href="index.html">PWCE release notes</a><span class="doc-meta">2026-09-07 · Batch 11</span></header><main>
+<h1>Local Studio authentication</h1><p class="lede">Direct callers now authenticate to the local Studio API with a development bearer token, while the browser uses a local session.</p>
+<h2>What changed</h2><ul><li>Set <code>PWCE_STUDIO_TOKEN</code> for scripts and direct API clients.</li><li>The Studio browser creates an HttpOnly same-origin session on loopback.</li><li>Unauthenticated API requests fail closed before they reach runtime or action services.</li></ul>
+<h2>Why it matters</h2><p>The local control surface now has an explicit authentication boundary without putting the Home Assistant token in the browser bundle or persisted PWCE state.</p>
+<h2>What to test</h2><ul class="test-list"><li><a href="../qa/inspect-local-context.html">QA: Inspect local context and request a safe action</a> — confirm the browser session loads the Studio and direct API calls use the configured token.</li></ul>
+<h2>Where to read more</h2><ul><li><a href="../manual/inspect-local-context.html">Inspect local context and request a safe action</a> — updated setup requirements.</li></ul>
+<h2>Screenshots updated</h2><ul><li>No visual screenshot change; the browser session is verified through the local API boundary.</li></ul>
+<h2>Known issues / follow-ups</h2><ul><li>Studio transport authentication and GatewayService authority-context issuance are not yet unified.</li></ul></main><footer class="doc-footer">PWCE release notes · 2026-09-07</footer></body></html>

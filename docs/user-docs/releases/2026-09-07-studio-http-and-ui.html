@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Local Studio and HTTP control surface — PWCE release notes</title><link rel="stylesheet" href="../assets/docs.css"></head>
+<body><header class="doc-header"><a href="index.html">PWCE release notes</a><span class="doc-meta">2026-09-07 · Batch 10</span></header><main>
+<h1>Local Studio and HTTP control surface</h1><p class="lede">You can now inspect local Home Assistant evidence and prepare a reversible action through PWCE Studio or its local HTTP API.</p>
+<h2>What changed</h2><ul><li>PWCE Studio shows runtime health, current state, evidence quality, observation history, and the controlled light-action boundary.</li><li>The approval flow can be requested and approved from Studio; live dispatch remains separately protected.</li><li>The local API exposes health, context, capabilities, preview, approval, dispatch, and action-status routes.</li><li>Live effects stay disabled unless you explicitly enable them in the development environment.</li></ul>
+<h2>Why it matters</h2><p>You can see what PWCE knows before you act. Unknown, offline, approval-required, and unreconciled outcomes remain visible instead of being presented as success.</p>
+<h2>What to test</h2><ul class="test-list"><li><a href="../qa/inspect-local-context.html">QA: Inspect local context and request a safe action</a> — focus on the evidence details, preview decision, in-Studio approval, and fail-closed live route.</li></ul>
+<h2>Where to read more</h2><ul><li><a href="../manual/inspect-local-context.html">Inspect local context and request a safe action</a> — full Studio walkthrough.</li></ul>
+<h2>Screenshots updated</h2><ul><li><code>inspect-local-context-01-studio-overview.png</code> — runtime, current evidence, and safe light action panels.</li></ul>
+<h2>Known issues / follow-ups</h2><ul><li>Live Home Assistant setup and effect dispatch remain development-only and require explicit environment configuration.</li></ul></main><footer class="doc-footer">PWCE release notes · 2026-09-07</footer></body></html>

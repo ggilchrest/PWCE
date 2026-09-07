@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Home Assistant source health — PWCE release notes</title><link rel="stylesheet" href="../assets/docs.css"></head>
+<body><header class="doc-header"><a href="index.html">PWCE release notes</a><span class="doc-meta">2026-09-07 · Batch 15</span></header><main>
+<h1>Home Assistant source health</h1><p class="lede">PWCE now records explicit Home Assistant source health transitions instead of leaving a connected source at a generic configured state.</p>
+<h2>What changed</h2><ul><li>The source reports connecting, online, degraded, and offline reasons through the local health response.</li><li>WebSocket closure and adapter shutdown are visible as offline transitions.</li></ul>
+<h2>Why it matters</h2><p>You can tell whether a source is configured, connected, degraded, or offline before relying on its current state.</p>
+<h2>What to test</h2><ul class="test-list"><li><a href="../qa/inspect-local-context.html">QA: Inspect local context and request a safe action</a> — focus on the runtime and source-health cards.</li></ul>
+<h2>Where to read more</h2><ul><li><a href="../manual/inspect-local-context.html">Inspect local context and request a safe action</a> — runtime troubleshooting.</li></ul>
+<h2>Screenshots updated</h2><ul><li>No new screenshot; the existing Studio overview remains the visual baseline.</li></ul>
+<h2>Known issues / follow-ups</h2><ul><li>Reconnect/backoff policy for a dropped WebSocket remains later runtime-hardening work.</li></ul></main><footer class="doc-footer">PWCE release notes · 2026-09-07</footer></body></html>
