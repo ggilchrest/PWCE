@@ -3,10 +3,12 @@
   "$id": "https://pwce.local/contracts/pwce-agent-gateway-profile-1.0.0.schema.json",
   "title": "PWCE Agent Gateway profile",
   "type": "object",
-  "required": ["profileId", "profileVersion", "schemaStatus", "schemaDigest", "operationCatalogVersion", "operationCatalogDigest", "compatibilityRange", "fixtures", "health", "operationCatalog"],
+  "required": ["profileId", "profileVersion", "bundleId", "bundleVersion", "schemaStatus", "schemaDigest", "operationCatalogVersion", "operationCatalogDigest", "compatibilityRange", "fixtures", "health", "operationCatalog"],
   "properties": {
     "profileId": { "const": "pwce-agent-gateway.v1" },
     "profileVersion": { "const": "1.0.0" },
+    "bundleId": { "const": "pwce-agent-gateway.bundle.v1" },
+    "bundleVersion": { "const": "1.0.0" },
     "schemaStatus": { "const": "published" },
     "schemaDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "operationCatalogVersion": { "const": "0.1.0" },

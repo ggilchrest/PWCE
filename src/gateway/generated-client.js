@@ -33,6 +33,8 @@ export class PwceAgentGatewayClient {
     const profile = await this.#json("/gateway/v1/profile", options);
     const compatible = profile.profileId === gatewayProfile.profileId
       && profile.profileVersion === gatewayProfile.profileVersion
+      && profile.bundleId === gatewayBundle.bundleId
+      && profile.bundleVersion === gatewayBundle.bundleVersion
       && profile.schemaStatus === "published"
       && profile.schemaDigest === gatewayBundle.bundleDigest
       && profile.operationCatalogVersion === gatewayProfile.operationCatalogVersion

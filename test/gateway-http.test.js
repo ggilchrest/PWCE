@@ -27,6 +27,8 @@ test("authenticated gateway HTTP binding issues authority and delegates requests
   assert.ok(profile.value.operationCatalogDigest);
   assert.equal(profile.value.schemaStatus, "published");
   assert.match(profile.value.schemaDigest, /^[a-f0-9]{64}$/);
+  assert.equal(profile.value.bundleId, "pwce-agent-gateway.bundle.v1");
+  assert.equal(profile.value.bundleVersion, "1.0.0");
   assert.equal(profile.value.health.status, "development");
   assert.equal(profile.value.compatibilityRange.minimum, "1.0.0");
   const authorityResponse = await invoke(binding, { pathname: "/gateway/v1/authority", method: "POST", authorization: "Bearer gateway-test-token", payload: { siteRefs: ["home.one"] } });
@@ -47,10 +49,12 @@ test("authenticated gateway HTTP binding issues authority and delegates requests
 test("fixture external Agent uses only the gateway HTTP contract", async () => {
   const calls = [];
   const responses = [
-    { ok: true, value: { profileId: "pwce-agent-gateway.v1", profileVersion: "1.0.0", schemaStatus: "published", schemaDigest: "b3e3d12384c17a2e659f0b66504d8cc226673bd2bc25bf135fdbe58fb8909717", operationCatalogVersion: "0.1.0", operationCatalogDigest: "445cb4e4b9811a26a41c5821c7d68b09f377b69d24d42ec6dcd0acec5d950b65", compatibilityRange: { minimum: "1.0.0", maximum: "1.x" }, health: { status: "development" }, fixtures: [{ fixtureSetId: "pwce.shared.contract.vectors", fixtureSetVersion: "0.1.0" }], operationCatalog: [{ operation: "context.query" }, { operation: "authority.getGrants" }, { operation: "health.get" }] } },
+    { ok: true, value: { profileId: "pwce-agent-gateway.v1", profileVersion: "1.0.0", bundleId: "pwce-agent-gateway.bundle.v1", bundleVersion: "1.0.0", schemaStatus: "published", schemaDigest: "2eb0c47b65cc254edf09b2893fab1eb36e00142eb361649798bec65c2f08fe11", operationCatalogVersion: "0.1.0", operationCatalogDigest: "445cb4e4b9811a26a41c5821c7d68b09f377b69d24d42ec6dcd0acec5d950b65", compatibilityRange: { minimum: "1.0.0", maximum: "1.x" }, health: { status: "development" }, fixtures: [{ fixtureSetId: "pwce.shared.contract.vectors", fixtureSetVersion: "0.1.0" }], operationCatalog: [{ operation: "context.query" }, { operation: "authority.getGrants" }, { operation: "health.get" }] } },
     { ok: true, value: { authorityContextRef: "authority.fixture", expiresAt: "2026-09-07T12:05:00Z", siteRefs: ["home.one"] } },
     { ok: true, value: { status: "known", value: 21, evidenceRefs: ["evidence.fixture"], limitations: [] } }
   ];
+  responses[0].value.bundleId = "pwce-agent-gateway.bundle.v1";
+  responses[0].value.bundleVersion = "1.0.0";
   const agent = new FixtureExternalAgent({ baseUrl: "http://pwce.local", token: "gateway-test-token", fetchImpl: async (url, options) => { calls.push({ url, options }); const next = responses.shift(); return new Response(JSON.stringify(next.value), { status: next.ok ? 200 : 400, headers: { "content-type": "application/json" } }); } });
   const result = await agent.answer({ question: "What is the temperature?", entityId: "sensor.temperature", property: "temperature" });
   assert.match(result.answer, /21/);
