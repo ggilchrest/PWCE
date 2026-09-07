@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pwce.local/contracts/pwce-lifestream-compatibility-lock-0.1.0.schema.json",
+  "title": "PWCE and Lifestream compatibility lock",
+  "type": "object",
+  "required": ["lockVersion", "pwceBundle", "pwceProfile", "lifestreamProfile", "adapterRevision", "environment", "requiredOperations", "results"],
+  "properties": {
+    "lockVersion": { "type": "string", "const": "0.1.0" },
+    "pwceBundle": {
+      "type": "object",
+      "required": ["bundleId", "bundleVersion", "bundleDigest"],
+      "properties": { "bundleId": { "const": "pwce-agent-gateway.bundle.v1" }, "bundleVersion": { "const": "1.0.0" }, "bundleDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" } },
+      "additionalProperties": false
+    },
+    "pwceProfile": { "$ref": "pwce-agent-gateway-profile-1.0.0.schema.json" },
+    "lifestreamProfile": {
+      "type": "object",
+      "required": ["profileId", "profileVersion", "schemaStatus", "schemaDigest", "operationCatalogDigest", "fixtures"],
+      "properties": { "profileId": { "const": "lifestream-pwce.v1" }, "profileVersion": { "type": "string", "minLength": 1 }, "schemaStatus": { "const": "published" }, "schemaDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "operationCatalogDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "fixtures": { "type": "array", "minItems": 1 } },
+      "additionalProperties": true
+    },
+    "adapterRevision": { "type": "string", "minLength": 1 },
+    "environment": { "type": "string", "minLength": 1 },
+    "requiredOperations": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } },
+    "results": { "type": "array", "minItems": 1, "items": { "type": "object", "required": ["target", "status"], "properties": { "target": { "type": "string" }, "status": { "enum": ["pass", "fail", "deferred"] } }, "additionalProperties": true } }
+  },
+  "additionalProperties": false
+}
