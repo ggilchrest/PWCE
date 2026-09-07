@@ -5,8 +5,9 @@ import { assertCompatibilityLock, validateCompatibilityLock } from "../src/gatew
 function draftLock() {
   return {
     lockVersion: "0.1.0",
+    pwceBundle: { bundleId: "pwce-agent-gateway.bundle.v1", bundleVersion: "1.0.0", bundleDigest: "b3e3d12384c17a2e659f0b66504d8cc226673bd2bc25bf135fdbe58fb8909717" },
     pwceProfile: { profileId: "pwce-agent-gateway.v1", profileVersion: "1.0.0", schemaDigest: "pwce-schema", operationCatalogDigest: "pwce-catalog", fixtures: ["pwce-fixtures"] },
-    lifestreamProfile: { profileId: "lifestream-pwce.v1", profileVersion: "1.0.0", schemaDigest: "lifestream-schema", operationCatalogDigest: "lifestream-catalog", fixtures: ["lifestream-fixtures"] },
+    lifestreamProfile: { profileId: "lifestream-pwce.v1", profileVersion: "1.0.0", schemaStatus: "unpublished", schemaDigest: "lifestream-schema", operationCatalogDigest: "lifestream-catalog", fixtures: ["lifestream-fixtures"] },
     adapterRevision: "adapter-rev",
     environment: "development",
     requiredOperations: ["context.query", "health.get"],
@@ -14,15 +15,15 @@ function draftLock() {
   };
 }
 
-test("compatibility lock fails closed while either selected schema is unpublished", () => {
+test("compatibility lock fails closed while the selected Lifestream schema is unpublished", () => {
   const errors = validateCompatibilityLock(draftLock());
-  assert.ok(errors.includes("selected PWCE gateway schema is not published"));
-  assert.ok(errors.includes("fixture Agent schema compatibility is not published"));
+  assert.ok(errors.includes("lifestreamProfile.schemaStatus is not published"));
   assert.throws(() => assertCompatibilityLock(draftLock()), { code: "incompatible_compatibility_lock" });
 });
 
 test("compatibility lock reports missing cross-repository evidence", () => {
   const errors = validateCompatibilityLock({ lockVersion: "0.1.0", pwceProfile: {}, lifestreamProfile: {} });
+  assert.ok(errors.includes("pwceBundle is required"));
   assert.ok(errors.some((error) => error.startsWith("lifestreamProfile.profileVersion")));
   assert.ok(errors.some((error) => error.startsWith("pwceProfile.schemaDigest")));
   assert.ok(errors.some((error) => error.startsWith("lifestreamProfile.schemaDigest")));

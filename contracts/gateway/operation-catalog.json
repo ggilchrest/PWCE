@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pwce.local/contracts/pwce-agent-gateway-operation-catalog-0.1.0.json",
+  "profileId": "pwce-agent-gateway.v1",
+  "operationCatalogVersion": "0.1.0",
+  "operations": [
+    { "operation": "context.getPreparedInputs", "kind": "query", "availability": "active" },
+    { "operation": "context.query", "kind": "query", "availability": "active" },
+    { "operation": "evidence.get", "kind": "query", "availability": "active" },
+    { "operation": "events.subscribe", "kind": "stream", "availability": "development" },
+    { "operation": "authority.evaluate", "kind": "authority", "availability": "active" },
+    { "operation": "authority.authorizeDispatch", "kind": "authority", "availability": "trusted_dispatch_only" },
+    { "operation": "authority.getGrants", "kind": "authority", "availability": "active" },
+    { "operation": "capabilities.getSnapshot", "kind": "query", "availability": "active" },
+    { "operation": "capabilities.invoke", "kind": "effect", "availability": "action_service_required" },
+    { "operation": "capabilities.getInvocation", "kind": "query", "availability": "action_service_required" },
+    { "operation": "trace.publish", "kind": "trace", "availability": "development" },
+    { "operation": "health.get", "kind": "query", "availability": "active" }
+  ]
+}

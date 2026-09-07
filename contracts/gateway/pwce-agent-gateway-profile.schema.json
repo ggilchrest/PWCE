@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pwce.local/contracts/pwce-agent-gateway-profile-1.0.0.schema.json",
+  "title": "PWCE Agent Gateway profile",
+  "type": "object",
+  "required": ["profileId", "profileVersion", "schemaStatus", "schemaDigest", "operationCatalogVersion", "operationCatalogDigest", "compatibilityRange", "fixtures", "health", "operationCatalog"],
+  "properties": {
+    "profileId": { "const": "pwce-agent-gateway.v1" },
+    "profileVersion": { "const": "1.0.0" },
+    "schemaStatus": { "const": "published" },
+    "schemaDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "operationCatalogVersion": { "const": "0.1.0" },
+    "operationCatalogDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "compatibilityRange": { "type": "object", "required": ["minimum", "maximum"], "properties": { "minimum": { "type": "string" }, "maximum": { "type": "string" } }, "additionalProperties": false },
+    "fixtures": { "type": "array", "items": { "type": "object", "required": ["fixtureSetId", "fixtureSetVersion", "status"], "properties": { "fixtureSetId": { "type": "string" }, "fixtureSetVersion": { "type": "string" }, "status": { "enum": ["draft", "published"] } }, "additionalProperties": false } },
+    "health": { "type": "object", "required": ["status", "custody"], "properties": { "status": { "type": "string" }, "custody": { "type": "string" } }, "additionalProperties": false },
+    "operationCatalog": { "type": "array", "items": { "type": "object", "required": ["operation", "kind", "availability"], "properties": { "operation": { "type": "string" }, "kind": { "type": "string" }, "availability": { "type": "string" } }, "additionalProperties": false } }
+  },
+  "additionalProperties": false
+}

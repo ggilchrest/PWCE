@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pwce.local/contracts/pwce-agent-gateway-response-1.0.0.schema.json",
+  "title": "PWCE Agent Gateway response envelope",
+  "type": "object",
+  "required": ["profileId", "profileVersion", "requestId", "correlationId", "worldRef", "executionEnvironmentRef"],
+  "properties": {
+    "profileId": { "const": "pwce-agent-gateway.v1" },
+    "profileVersion": { "const": "1.0.0" },
+    "requestId": { "type": "string", "minLength": 1 },
+    "correlationId": { "type": "string", "minLength": 1 },
+    "worldRef": { "type": "string", "minLength": 1 },
+    "executionEnvironmentRef": { "enum": ["normal", "live", "test", "replay", "simulation", "dry-run"] },
+    "limitations": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": true
+}

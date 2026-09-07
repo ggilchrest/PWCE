@@ -16,4 +16,4 @@ The validator also requires an explicit Lifestream profile version while leaving
 
 ## Boundary
 
-The validator does not create or infer the Lifestream mapping, schema, fixtures, or adapter revision. It remains intentionally unsatisfied until those Lifestream-owned artifacts and the final PWCE schemas are committed.
+The validator does not create or infer the Lifestream mapping, schema, fixtures, or adapter revision. It remains intentionally unsatisfied until those Lifestream-owned artifacts are committed.
