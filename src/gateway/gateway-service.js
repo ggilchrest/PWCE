@@ -5,7 +5,13 @@ import { getHealth } from "../runtime/health.js";
 
 const PROFILE_ID = "pwce-agent-gateway.v1";
 const PROFILE_VERSION = "1.0.0";
-const operationCatalog = Object.freeze([
+function deepFreeze(value) {
+  if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
+  for (const child of Object.values(value)) deepFreeze(child);
+  return Object.freeze(value);
+}
+
+const operationCatalog = deepFreeze([
   { operation: "context.getPreparedInputs", kind: "query", availability: "active" },
   { operation: "context.query", kind: "query", availability: "active" },
   { operation: "evidence.get", kind: "query", availability: "active" },
@@ -449,4 +455,4 @@ export class GatewayService {
   }
 }
 
-export const gatewayProfile = Object.freeze({ profileId: PROFILE_ID, profileVersion: PROFILE_VERSION, bundleId: "pwce-agent-gateway.bundle.v1", bundleVersion: "1.0.0", schemaStatus: "published", schemaDigest: "2eb0c47b65cc254edf09b2893fab1eb36e00142eb361649798bec65c2f08fe11", operationCatalogVersion: "0.1.0", operationCatalogDigest: catalogDigest, compatibilityRange: { minimum: PROFILE_VERSION, maximum: "1.x" }, fixtures: [{ fixtureSetId: "pwce.shared.contract.vectors", fixtureSetVersion: "0.1.0", status: "published" }], health: { status: "development", custody: "bounded" }, operationCatalog });
+export const gatewayProfile = deepFreeze({ profileId: PROFILE_ID, profileVersion: PROFILE_VERSION, bundleId: "pwce-agent-gateway.bundle.v1", bundleVersion: "1.0.0", schemaStatus: "published", schemaDigest: "2eb0c47b65cc254edf09b2893fab1eb36e00142eb361649798bec65c2f08fe11", operationCatalogVersion: "0.1.0", operationCatalogDigest: catalogDigest, compatibilityRange: { minimum: PROFILE_VERSION, maximum: "1.x" }, fixtures: [{ fixtureSetId: "pwce.shared.contract.vectors", fixtureSetVersion: "0.1.0", status: "published" }], health: { status: "development", custody: "bounded" }, operationCatalog });
