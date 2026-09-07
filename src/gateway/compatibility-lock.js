@@ -15,7 +15,8 @@ function validateProfile(lockProfile, expected, path, errors) {
     return;
   }
   if (lockProfile.profileId !== expected.profileId) errors.push(`${path}.profileId does not match the selected PWCE profile`);
-  if (lockProfile.profileVersion !== expected.profileVersion) errors.push(`${path}.profileVersion does not match the selected PWCE profile`);
+  requiredString(lockProfile.profileVersion, `${path}.profileVersion`, errors);
+  if (expected.profileVersion && lockProfile.profileVersion !== expected.profileVersion) errors.push(`${path}.profileVersion does not match the selected PWCE profile`);
   requiredString(lockProfile.schemaDigest, `${path}.schemaDigest`, errors);
   requiredString(lockProfile.operationCatalogDigest, `${path}.operationCatalogDigest`, errors);
   requiredArray(lockProfile.fixtures, `${path}.fixtures`, errors);

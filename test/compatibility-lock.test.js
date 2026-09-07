@@ -23,6 +23,7 @@ test("compatibility lock fails closed while either selected schema is unpublishe
 
 test("compatibility lock reports missing cross-repository evidence", () => {
   const errors = validateCompatibilityLock({ lockVersion: "0.1.0", pwceProfile: {}, lifestreamProfile: {} });
+  assert.ok(errors.some((error) => error.startsWith("lifestreamProfile.profileVersion")));
   assert.ok(errors.some((error) => error.startsWith("pwceProfile.schemaDigest")));
   assert.ok(errors.some((error) => error.startsWith("lifestreamProfile.schemaDigest")));
   assert.ok(errors.includes("adapterRevision must be a non-empty string"));

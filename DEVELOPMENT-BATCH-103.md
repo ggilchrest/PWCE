@@ -4,6 +4,8 @@
 
 PWCE now has a fail-closed validator for the small cross-repository compatibility lock required before integrated Lifestream adapter work. It requires both profile identities and schema digests, fixtures, adapter revision, environment, required operation coverage, and fixture/real-gateway results.
 
+The validator also requires an explicit Lifestream profile version while leaving its value to the Lifestream-owned bundle.
+
 ## Evidence
 
 - `src/gateway/compatibility-lock.js` validates the lock and rejects unpublished schemas.
