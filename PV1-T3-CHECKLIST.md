@@ -16,4 +16,4 @@ Status: `in_progress`
 | Bounded gateway invalidation replay survives service restart | `pass` | `src/gateway/gateway-service.js`; `test/gateway-service.test.js` — restart replay |
 | External fixture Agent compatibility | `pass` | `src/agent/fixture-external-agent.js`; `scripts/pwce-fixture-agent.mjs`; `test/gateway-http.test.js`; local standalone HTTP smoke |
 | Lifestream mapping compatibility | `deferred` | Owned by the separate Lifestream repository |
-| Effect authorization and dispatch | `deferred` | Activated by PV1-T4 |
+| Effect authorization and dispatch | `pass` | `src/gateway/gateway-service.js`; `test/gateway-service.test.js`; `PV1-T4-CHECKLIST.md` |
