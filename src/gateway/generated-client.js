@@ -1,9 +1,13 @@
+import { gatewayBundle } from "./gateway-bundle.js";
+import { gatewayProfile } from "./gateway-service.js";
+
 // Generated client surface for pwce-agent-gateway.v1@1.0.0.
 // Keep this transport-only: Lifestream owns its mapping and provider semantics.
 export class PwceAgentGatewayClient {
   #baseUrl;
   #token;
   #fetch;
+  #profilePromise = null;
 
   constructor({ baseUrl, token, fetchImpl = globalThis.fetch } = {}) {
     if (typeof baseUrl !== "string" || !baseUrl) throw new Error("gateway base URL is required");
@@ -25,11 +29,30 @@ export class PwceAgentGatewayClient {
     return result;
   }
 
-  profile(options) { return this.#json("/gateway/v1/profile", options); }
+  async profile(options) {
+    const profile = await this.#json("/gateway/v1/profile", options);
+    const compatible = profile.profileId === gatewayProfile.profileId
+      && profile.profileVersion === gatewayProfile.profileVersion
+      && profile.schemaStatus === "published"
+      && profile.schemaDigest === gatewayBundle.bundleDigest
+      && profile.operationCatalogVersion === gatewayProfile.operationCatalogVersion
+      && profile.operationCatalogDigest === gatewayProfile.operationCatalogDigest;
+    if (!compatible) {
+      const error = new Error("incompatible gateway profile");
+      error.code = "incompatible_gateway_profile";
+      throw error;
+    }
+    return profile;
+  }
+
+  async #ensureProfile(options) {
+    this.#profilePromise ??= this.profile(options).catch((error) => { this.#profilePromise = null; throw error; });
+    return this.#profilePromise;
+  }
 
   authority(payload, options) { return this.#json("/gateway/v1/authority", { ...options, method: "POST", body: payload }); }
 
-  request(payload, options) { return this.#json("/gateway/v1/request", { ...options, method: "POST", body: payload }); }
+  async request(payload, options) { await this.#ensureProfile(options); return this.#json("/gateway/v1/request", { ...options, method: "POST", body: payload }); }
 
   getPreparedInputs(payload, options) { return this.request({ ...payload, operation: "context.getPreparedInputs" }, options); }
   queryContext(payload, options) { return this.request({ ...payload, operation: "context.query" }, options); }
