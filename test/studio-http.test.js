@@ -49,6 +49,22 @@ test("registers an optional second Home Assistant site without widening the acti
   service.stop();
 });
 
+test("gives a secondary Home Assistant site bounded live reconnect handling", async () => {
+  const store = new StateStore({ state: emptyState() });
+  const sockets = [];
+  const service = await createStudioService({
+    store,
+    env: { PWCE_HA_URL_HOME_TWO: "http://ha.two:8123", PWCE_HA_TOKEN_REF_HOME_TWO: "env://TOKEN_TWO", TOKEN_TWO: "token-two", PWCE_STUDIO_SYNC_ON_START: "false", PWCE_STUDIO_LIVE_EVENTS: "true", PWCE_HA_RECONNECT_INITIAL_MS: "0", PWCE_HA_RECONNECT_MAX_MS: "0", PWCE_HA_RECONNECT_MAX_ATTEMPTS: "1" },
+    websocketFactory: () => { const socket = { send() {}, close() {}, onmessage: null, onerror: null, onclose: null }; sockets.push(socket); return socket; }
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(sockets.length, 1);
+  sockets[0].onerror();
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(sockets.length, 2);
+  service.stop();
+});
+
 test("lists only authorized site identities for Studio inspection", async () => {
   const store = new StateStore({ state: emptyState() });
   const service = await createStudioService({

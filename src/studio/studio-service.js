@@ -23,7 +23,7 @@ export async function createStudioService({ store, env = process.env, fetchImpl 
   let connecting = false;
   let reconnectTimer = null;
   let reconnectAttempt = 0;
-  const secondaryAdapters = [];
+  const secondaryRuntimes = [];
   const configuredSiteRefs = [siteRef];
   let connectLive = async () => {};
   const { initialMs: reconnectInitialMs, maxMs: reconnectMaxMs, maxAttempts: reconnectMaxAttempts } = readReconnectConfig(env);
@@ -111,14 +111,26 @@ export async function createStudioService({ store, env = process.env, fetchImpl 
   for (const suffix of suffixes) {
     if (!env[`PWCE_HA_TOKEN_REF_${suffix}`]) continue;
     const secondaryConfig = homeAssistantConfigFromEnv(env, suffix);
+    const secondaryRuntime = { adapter: null, reconnectTimer: null, reconnectAttempt: 0, connecting: false };
+    const scheduleSecondaryReconnect = (reason) => {
+      if (stopped || secondaryRuntime.connecting || secondaryRuntime.reconnectTimer) return;
+      if (!canReconnect({ attempt: secondaryRuntime.reconnectAttempt, maxAttempts: reconnectMaxAttempts })) {
+        void setSourceHealth(secondaryConfig.sourceRef, { status: "offline", reason: "reconnect_attempts_exhausted" });
+        return;
+      }
+      const delay = reconnectDelay({ initialMs: reconnectInitialMs, maxMs: reconnectMaxMs, attempt: secondaryRuntime.reconnectAttempt });
+      secondaryRuntime.reconnectAttempt += 1;
+      secondaryRuntime.reconnectTimer = setTimeout(() => { secondaryRuntime.reconnectTimer = null; void connectSecondary(); }, delay);
+      secondaryRuntime.reconnectTimer.unref?.();
+    };
     const secondaryAdapter = new HomeAssistantAdapter({
       config: secondaryConfig,
       resolveToken: (ref) => resolveSecretReference(ref, env),
       fetchImpl,
       websocketFactory,
-      onStatus: (status) => { if (!stopped) void setSourceHealth(secondaryConfig.sourceRef, status); }
+      onStatus: (status) => { if (!stopped) { void setSourceHealth(secondaryConfig.sourceRef, status); if ((status.status === "degraded" || status.status === "offline") && !secondaryRuntime.connecting) scheduleSecondaryReconnect(status.reason); } }
     });
-    secondaryAdapters.push(secondaryAdapter);
+    secondaryRuntime.adapter = secondaryAdapter;
     configuredSiteRefs.push(secondaryConfig.siteRef);
     await ensureRegistration(store, { siteRef: secondaryConfig.siteRef, sourceRef: secondaryConfig.sourceRef });
     if (env.PWCE_STUDIO_SYNC_ON_START !== "false") {
@@ -130,9 +142,19 @@ export async function createStudioService({ store, env = process.env, fetchImpl 
         }
       } catch (error) { await setSourceHealth(secondaryConfig.sourceRef, { status: "degraded", reason: error.message }); }
     }
-    if (env.PWCE_STUDIO_LIVE_EVENTS !== "false") {
-      secondaryAdapter.subscribeStateChanges((observation) => ingestObservation(store, observation)).catch((error) => setSourceHealth(secondaryConfig.sourceRef, { status: "degraded", reason: error.message }));
-    }
+    const connectSecondary = async () => {
+      if (stopped || secondaryRuntime.connecting) return;
+      secondaryRuntime.connecting = true;
+      try {
+        await secondaryAdapter.subscribeStateChanges((observation) => ingestObservation(store, observation));
+        secondaryRuntime.reconnectAttempt = 0;
+      } catch (error) {
+        secondaryRuntime.connecting = false;
+        if (!stopped) { await setSourceHealth(secondaryConfig.sourceRef, { status: "degraded", reason: error.message }); scheduleSecondaryReconnect(error.message); }
+      } finally { secondaryRuntime.connecting = false; }
+    };
+    if (env.PWCE_STUDIO_LIVE_EVENTS !== "false") connectSecondary();
+    secondaryRuntimes.push(secondaryRuntime);
   }
   return {
     siteRef,
@@ -149,7 +171,7 @@ export async function createStudioService({ store, env = process.env, fetchImpl 
       if (reconnectTimer) clearTimeout(reconnectTimer);
       reconnectTimer = null;
       adapter?.close();
-      for (const secondaryAdapter of secondaryAdapters) secondaryAdapter.close();
+      for (const secondaryRuntime of secondaryRuntimes) { if (secondaryRuntime.reconnectTimer) clearTimeout(secondaryRuntime.reconnectTimer); secondaryRuntime.reconnectTimer = null; secondaryRuntime.adapter.close(); }
       runtimeStatus = { status: "offline", reason: "studio_stopped" };
       void setSourceHealth(sourceRef, { status: "offline", reason: "studio_stopped" });
     }
