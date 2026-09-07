@@ -4,3 +4,6 @@
 # Disposable local development state and credentials.
 /.dev/
 /.env
+
+# macOS filesystem metadata.
+.DS_Store
