@@ -30,6 +30,10 @@ function equalDigest(left, right) {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
+function materialSourceRevision(state) {
+  return createHash("sha256").update(JSON.stringify({ sites: state.sites, sources: state.sources, entities: state.entities, observations: state.observations, projections: state.projections })).digest("hex");
+}
+
 function fail(code, message) {
   const error = new Error(message);
   error.code = code;
@@ -222,7 +226,7 @@ export class GatewayService {
     });
     const known = items.some((item) => item.status === "known");
     const conflicted = items.some((item) => item.status === "conflicted");
-    return { profileId: PROFILE_ID, profileVersion: PROFILE_VERSION, sliceRef: randomUUID(), worldRef: state.worldRef, sourceRevision: state.revision, evaluatedAt: this.#clock().toISOString(), siteRefs, externalEntityId, property, status: conflicted ? "conflicted" : known ? "known" : "unknown", knowledgeState: conflicted ? "conflicted" : known ? "current" : "unknown", basis: known || conflicted ? "observed" : null, items, invalidationCursor: String(this.#eventSequence), limitations: ["Multi-site current results remain site-qualified; values are not merged across sites."] };
+    return { profileId: PROFILE_ID, profileVersion: PROFILE_VERSION, sliceRef: randomUUID(), worldRef: state.worldRef, sourceRevision: materialSourceRevision(state), evaluatedAt: this.#clock().toISOString(), siteRefs, externalEntityId, property, status: conflicted ? "conflicted" : known ? "known" : "unknown", knowledgeState: conflicted ? "conflicted" : known ? "current" : "unknown", basis: known || conflicted ? "observed" : null, items, invalidationCursor: String(this.#eventSequence), limitations: ["Multi-site current results remain site-qualified; values are not merged across sites."] };
   }
 
   async #current(context, input) {
@@ -230,7 +234,7 @@ export class GatewayService {
     const state = await this.#store.load();
     const key = `${input.siteRef}::${input.externalEntityId}::${input.property}`;
     const projection = state.projections[key];
-    const base = { sliceRef: randomUUID(), worldRef: state.worldRef, sourceRevision: state.revision, evaluatedAt: this.#clock().toISOString(), siteRef: input.siteRef, invalidationCursor: String(this.#eventSequence), limitations: [] };
+    const base = { sliceRef: randomUUID(), worldRef: state.worldRef, sourceRevision: materialSourceRevision(state), evaluatedAt: this.#clock().toISOString(), siteRef: input.siteRef, invalidationCursor: String(this.#eventSequence), limitations: [] };
     if (!projection) return { ...base, status: "unknown", knowledgeState: "unknown", basis: null, reason: "no_accepted_observation", entityRef: `${input.siteRef}::${input.externalEntityId}`, property: input.property };
     const conflicted = projection.knowledgeState === "conflicted";
     const evidenceRefs = conflicted ? projection.contradictions.map((contradiction) => contradiction.observationRef) : [projection.observationRef];
@@ -273,7 +277,7 @@ export class GatewayService {
     }));
     const inputs = allInputs.slice(0, limit);
     const sources = Object.values(state.sources).filter((source) => source.siteRef === siteRef).map((source) => ({ sourceRef: source.sourceRef, status: source.status, lastStatusReason: source.lastStatusReason ?? null, lastEventTime: source.lastEventTime ?? null }));
-    return { profileId: PROFILE_ID, profileVersion: PROFILE_VERSION, worldRef: state.worldRef, siteRef, revision: state.revision, knowledgeState: inputs.length ? "known" : "unknown", inputs, sources, hasMore: allInputs.length > limit, limitations: ["Prepared inputs are bounded current projections; they are not a complete prompt or conversation context.", ...(allInputs.length > limit ? ["Prepared inputs were truncated at the requested limit."] : [])] };
+    return { profileId: PROFILE_ID, profileVersion: PROFILE_VERSION, worldRef: state.worldRef, siteRef, revision: materialSourceRevision(state), knowledgeState: inputs.length ? "known" : "unknown", inputs, sources, hasMore: allInputs.length > limit, limitations: ["Prepared inputs are bounded current projections; they are not a complete prompt or conversation context.", ...(allInputs.length > limit ? ["Prepared inputs were truncated at the requested limit."] : [])] };
   }
 
   #boundedPreparedResponse(input, result) {
@@ -286,7 +290,7 @@ export class GatewayService {
     const grant = this.#actionService?.getGrant(context.principalRef);
     const siteRefs = grant ? grant.siteRefs.filter((siteRef) => context.siteRefs.includes(siteRef)) : [...context.siteRefs];
     const capabilityRefs = grant?.capabilityRefs ?? [];
-    return { profileId: PROFILE_ID, profileVersion: PROFILE_VERSION, principalRef: context.principalRef, siteRefs, capabilityRefs, sourceRevision: state.revision, limitations: capabilityRefs.length ? [] : ["No effect capability grant is activated in the current gateway tier."] };
+    return { profileId: PROFILE_ID, profileVersion: PROFILE_VERSION, principalRef: context.principalRef, siteRefs, capabilityRefs, sourceRevision: materialSourceRevision(state), limitations: capabilityRefs.length ? [] : ["No effect capability grant is activated in the current gateway tier."] };
   }
 
   #capabilitySnapshot(context) {
