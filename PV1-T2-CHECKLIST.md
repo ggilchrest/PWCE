@@ -1,8 +1,8 @@
 # PWCE Personal V1 — PV1-T2 local evidence checklist
 
-Status: `in_progress`
+Status: `passed`
 
-This checklist records site-qualified reads, multi-site aggregation, contradiction handling, and write isolation. The second-site evidence below uses the deterministic Home Assistant fixture and optional local-site configuration. A separately operated second Home Assistant installation remains deferred.
+This checklist records site-qualified reads, multi-site aggregation, contradiction handling, and write isolation. Both separately operated local Home Assistant installations now have authenticated read-only synchronization evidence; live effects remain separately protected.
 
 | Check | Result | Evidence |
 |---|---|---|
@@ -14,4 +14,4 @@ This checklist records site-qualified reads, multi-site aggregation, contradicti
 | History, as-of, and explanation reads remain site-scoped | `pass` | `src/domain/query-service.js`; `test/adapter-and-query.test.js`; `test/gateway-service.test.js` |
 | Same-time conflicting observations are explicit rather than silently resolved | `pass` | `src/domain/observation-service.js`; `test/runtime-state.test.js`; `test/gateway-service.test.js` |
 | Cross-site action attempts fail before an external effect | `pass` | `src/actions/home-assistant-target.js`; `test/studio-http.test.js`; `test/gateway-service.test.js` |
-| Separately operated second Home Assistant installation | `deferred` | `pwce-homeassistant-dev-two` is healthy on `127.0.0.1:8124` and returns the expected unauthenticated `401`; its separate onboarding and token are still required before authenticated live-sync evidence can be claimed |
+| Separately operated second Home Assistant installation | `pass` | `DEVELOPMENT-BATCH-159.md` — authenticated read-only startup sync against `pwce-homeassistant-dev-two`; source became `online` and emitted a site-qualified `light.kitchen_lights` observation |
