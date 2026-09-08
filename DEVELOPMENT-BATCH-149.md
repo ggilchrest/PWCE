@@ -12,6 +12,7 @@ Studio now supports the approved local Human session profile: username/password 
 - `test/studio-auth.test.js` covers credential validation, secret storage, recovery consumption, and session behavior.
 - `docs/user-docs/qa/inspect-local-context.html` and the related manual/release note describe the user-visible flow.
 - `npm test`, `npm run validate`, and `git diff --check` pass.
+- Disposable live HTTP smoke passed: password login `200`, protected health access `200`, logout `200`, first recovery login `200`, and recovery-code reuse `401 authentication_failed`.
 
 ## Boundary
 
