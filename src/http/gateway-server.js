@@ -2,44 +2,17 @@ import { timingSafeEqual } from "node:crypto";
 import { GatewayService, gatewayProfile } from "../gateway/gateway-service.js";
 import { gatewayBundle } from "../gateway/gateway-bundle.js";
 import { validateAuthorityRequest } from "./gateway-contract.js";
+import { MAX_TRANSPORT_BYTES, readJsonBody } from "./json-body.js";
 
 function json(res, status, value) {
   const encoded = JSON.stringify(value);
-  if (Buffer.byteLength(encoded, "utf8") > MAX_REQUEST_BYTES) {
+  if (Buffer.byteLength(encoded, "utf8") > MAX_TRANSPORT_BYTES) {
     res.writeHead(500, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
     res.end(JSON.stringify({ error: { code: "limit_exceeded", message: "response body exceeds the 1 MiB transport limit" } }));
     return;
   }
   res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
   res.end(encoded);
-}
-
-const MAX_REQUEST_BYTES = 1_048_576;
-
-async function body(req) {
-  const declaredLength = Number(req.headers?.["content-length"] ?? req.headers?.["Content-Length"]);
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_REQUEST_BYTES) {
-    const error = new Error("request body exceeds the 1 MiB transport limit");
-    error.code = "limit_exceeded";
-    throw error;
-  }
-  let text = "";
-  let byteLength = 0;
-  for await (const chunk of req) {
-    byteLength += Buffer.byteLength(chunk);
-    if (byteLength > MAX_REQUEST_BYTES) {
-      const error = new Error("request body exceeds the 1 MiB transport limit");
-      error.code = "limit_exceeded";
-      throw error;
-    }
-    text += chunk;
-  }
-  if (!text) return {};
-  try { return JSON.parse(text); } catch {
-    const error = new Error("request body must be valid JSON");
-    error.code = "invalid_request";
-    throw error;
-  }
 }
 
 function bearer(req) {
@@ -60,7 +33,7 @@ function authError(error) {
 
 function sse(res, result) {
   const frameFor = (event) => `id: ${event.cursor}\nevent: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
-  if (result.events.some((event) => Buffer.byteLength(frameFor(event), "utf8") > MAX_REQUEST_BYTES)) {
+  if (result.events.some((event) => Buffer.byteLength(frameFor(event), "utf8") > MAX_TRANSPORT_BYTES)) {
     const error = new Error("event stream frame exceeds the 1 MiB transport limit");
     error.code = "limit_exceeded";
     throw error;
@@ -68,7 +41,7 @@ function sse(res, result) {
   res.writeHead(200, { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-store", connection: "keep-alive" });
   const writeEvent = (event) => {
     const frame = frameFor(event);
-    if (Buffer.byteLength(frame, "utf8") > MAX_REQUEST_BYTES) { res.end(); return; }
+    if (Buffer.byteLength(frame, "utf8") > MAX_TRANSPORT_BYTES) { res.end(); return; }
     return res.write(frame);
   };
   if (result.resyncRequired) res.write("event: resync.required\ndata: {\"reason\":\"cursor_expired\"}\n\n");
@@ -114,11 +87,11 @@ export function createGatewayHttpBinding({ store, token, principalRef = "agent.f
       try {
         if (pathname === "/gateway/v1/authority") {
           if (!sameSecret(presentedToken, token)) throw new Error("authentication failed");
-          const payload = validateAuthorityRequest(await body(req));
+          const payload = validateAuthorityRequest(await readJsonBody(req));
           return json(res, 201, gateway.issueAuthorityContext({ principalRef, token: presentedToken, siteRefs: payload.siteRefs, ttlMs: payload.ttlMs, assistantRef: payload.assistantRef, endpointRef: payload.endpointRef, participantRefs: payload.participantRefs, audienceRef: payload.audienceRef })), true;
         }
         if (pathname === "/gateway/v1/request") {
-          const payload = await body(req);
+          const payload = await readJsonBody(req);
           const result = await gateway.requestAuthenticated({ token: presentedToken, ...payload });
           return json(res, 200, result), true;
         }

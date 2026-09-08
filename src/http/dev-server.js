@@ -9,6 +9,7 @@ import { queryHistory, explainCurrent } from "../domain/query-service.js";
 import { createStudioService } from "../studio/studio-service.js";
 import { createStudioSessionRegistry, getStudioContext, parseCookies } from "./studio-auth.js";
 import { createGatewayHttpBinding } from "./gateway-server.js";
+import { MAX_TRANSPORT_BYTES, readJsonBody } from "./json-body.js";
 import { BasicAgent } from "../agent/basic-agent.js";
 
 const root = resolve(fileURLToPath(new URL("../../", import.meta.url)));
@@ -16,15 +17,13 @@ const studioRoot = join(root, "src", "studio");
 const contentTypes = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8" };
 
 function json(res, status, value) {
+  const encoded = JSON.stringify(value);
+  if (Buffer.byteLength(encoded, "utf8") > MAX_TRANSPORT_BYTES) {
+    res.writeHead(500, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+    return res.end(JSON.stringify({ error: { code: "limit_exceeded", message: "response body exceeds the 1 MiB transport limit" } }));
+  }
   res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
-  res.end(JSON.stringify(value));
-}
-
-async function body(req) {
-  let text = "";
-  for await (const chunk of req) text += chunk;
-  if (!text) return {};
-  try { return JSON.parse(text); } catch { throw new Error("request body must be valid JSON"); }
+  res.end(encoded);
 }
 
 function requestFromPayload(payload, service) {
@@ -79,16 +78,16 @@ export async function createStudioHttpServer({ env = process.env, store, service
         }
         if (req.method === "GET" && url.pathname === "/api/capabilities") return json(res, 200, effectiveService.actionService?.snapshot() ?? { version: "1.0.0", capabilities: [] });
         if (req.method === "GET" && url.pathname === "/api/agent") return json(res, 200, basicAgent.definition);
-        if (req.method === "POST" && url.pathname === "/api/agent/message") return json(res, 200, await basicAgent.answer(await body(req)));
+        if (req.method === "POST" && url.pathname === "/api/agent/message") return json(res, 200, await basicAgent.answer(await readJsonBody(req)));
         if (req.method === "GET" && url.pathname === "/api/context/current") { const siteRefs = (url.searchParams.get("siteRefs") ?? "").split(",").filter(Boolean); if (siteRefs.length > 1) { siteRefs.forEach(requireSite); return json(res, 200, await getCurrentAggregate(effectiveStore, { siteRefs, externalEntityId: url.searchParams.get("entityId") ?? effectiveService.entityId, property: url.searchParams.get("property") ?? "state" })); } const siteRef = url.searchParams.get("siteRef") ?? effectiveService.siteRef; requireSite(siteRef); return json(res, 200, await getCurrent(effectiveStore, { siteRef, externalEntityId: url.searchParams.get("entityId") ?? effectiveService.entityId, property: url.searchParams.get("property") ?? "state" })); }
         if (req.method === "GET" && url.pathname === "/api/context/explain") { const siteRef = url.searchParams.get("siteRef") ?? effectiveService.siteRef; requireSite(siteRef); return json(res, 200, await explainCurrent(effectiveStore, { siteRef, externalEntityId: url.searchParams.get("entityId") ?? effectiveService.entityId, property: url.searchParams.get("property") ?? "state" })); }
         if (req.method === "GET" && url.pathname === "/api/context/history") { const siteRef = url.searchParams.get("siteRef") ?? effectiveService.siteRef; requireSite(siteRef); const limitText = url.searchParams.get("limit"); const limit = limitText === null ? undefined : Number(limitText); const history = await queryHistory(effectiveStore, { siteRef, externalEntityId: url.searchParams.get("entityId") ?? effectiveService.entityId, property: url.searchParams.get("property") ?? "state", limit, cursor: url.searchParams.get("cursor") ?? undefined }); return json(res, 200, history); }
         if (req.method === "POST" && url.pathname === "/api/actions/preview") {
           if (!effectiveService.actionService) return json(res, 503, { error: "home_assistant_not_configured" });
-          const request = requestFromPayload(await body(req), effectiveService); requireSite(request.siteRef); return json(res, 200, effectiveService.actionService.preview(request));
+          const request = requestFromPayload(await readJsonBody(req), effectiveService); requireSite(request.siteRef); return json(res, 200, effectiveService.actionService.preview(request));
         }
         if (req.method === "POST" && url.pathname === "/api/approvals") {
-          const request = requestFromPayload(await body(req), effectiveService);
+          const request = requestFromPayload(await readJsonBody(req), effectiveService);
           requireSite(request.siteRef);
           return json(res, 201, await effectiveService.approvalService.request({ request, requestedBy: "principal.studio" }));
         }
@@ -96,7 +95,7 @@ export async function createStudioHttpServer({ env = process.env, store, service
         if (req.method === "POST" && approvalMatch) { const state = await effectiveStore.load(); const approval = state.approvals[approvalMatch[1]]; if (!approval) return json(res, 404, { error: "approval_not_found" }); if (approval.siteRef) requireSite(approval.siteRef); return json(res, 200, await effectiveService.approvalService.approve({ approvalRef: approvalMatch[1], approvedBy: "human.local" })); }
         if (req.method === "POST" && url.pathname === "/api/actions/dispatch") {
           if (!effectiveService.actionService) return json(res, 503, { error: "home_assistant_not_configured" });
-          const request = requestFromPayload(await body(req), effectiveService);
+          const request = requestFromPayload(await readJsonBody(req), effectiveService);
           requireSite(request.siteRef);
           const admitted = await effectiveService.actionService.authorizeDispatch(request);
           if (!admitted.action) return json(res, 403, admitted);
