@@ -28,7 +28,13 @@ export class PwceAgentGatewayClient {
       throw error;
     }
     const response = await this.#fetch(`${this.#baseUrl}${path}`, { method, signal, headers: { Authorization: `Bearer ${this.#token}`, "Content-Type": "application/json" }, ...(encodedBody === undefined ? {} : { body: encodedBody }) });
-    const result = await response.json();
+    const responseBytes = await response.arrayBuffer();
+    if (responseBytes.byteLength > MAX_JSON_REQUEST_BYTES) {
+      const error = new Error("response body exceeds the 1 MiB transport limit");
+      error.code = "limit_exceeded";
+      throw error;
+    }
+    const result = JSON.parse(new TextDecoder().decode(responseBytes));
     if (!response.ok) {
       const error = new Error(result.error?.message ?? "gateway request failed");
       error.code = result.error?.code ?? "gateway_request_failed";

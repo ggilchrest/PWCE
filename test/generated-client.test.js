@@ -67,3 +67,8 @@ test("generated gateway client rejects oversized JSON before transport", async (
   await assert.rejects(() => client.authority({ siteRefs: ["home.one"], padding: "x".repeat(1_048_550) }), { code: "limit_exceeded" });
   assert.deepEqual(calls, ["http://pwce.local/gateway/v1/profile"]);
 });
+
+test("generated gateway client rejects oversized JSON responses", async () => {
+  const client = new PwceAgentGatewayClient({ baseUrl: "http://pwce.local", token: "gateway-test-token", fetchImpl: async () => new Response("x".repeat(1_048_577), { status: 200 }) });
+  await assert.rejects(() => client.profile(), { code: "limit_exceeded" });
+});

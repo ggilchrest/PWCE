@@ -113,6 +113,14 @@ test("HTTP gateway rejects request bodies over the shared transport limit", asyn
   assert.equal(response.value.error.code, "limit_exceeded");
 });
 
+test("HTTP gateway rejects oversized response bodies", async () => {
+  const gateway = { registerPrincipal() {}, async requestAuthenticated() { return { padding: "x".repeat(1_048_570) }; } };
+  const binding = createGatewayHttpBinding({ store: store(), token: "gateway-test-token", gateway });
+  const response = await invoke(binding, { pathname: "/gateway/v1/request", method: "POST", authorization: "Bearer gateway-test-token", payload: { operation: "health.get", authorityContextRef: "authority.fixture" } });
+  assert.equal(response.status, 500);
+  assert.equal(response.value.error.code, "limit_exceeded");
+});
+
 test("fixture external Agent uses only the gateway HTTP contract", async () => {
   const calls = [];
   const responses = [

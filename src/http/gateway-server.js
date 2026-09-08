@@ -4,8 +4,14 @@ import { gatewayBundle } from "../gateway/gateway-bundle.js";
 import { validateAuthorityRequest } from "./gateway-contract.js";
 
 function json(res, status, value) {
+  const encoded = JSON.stringify(value);
+  if (Buffer.byteLength(encoded, "utf8") > MAX_REQUEST_BYTES) {
+    res.writeHead(500, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+    res.end(JSON.stringify({ error: { code: "limit_exceeded", message: "response body exceeds the 1 MiB transport limit" } }));
+    return;
+  }
   res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
-  res.end(JSON.stringify(value));
+  res.end(encoded);
 }
 
 const MAX_REQUEST_BYTES = 1_048_576;
