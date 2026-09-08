@@ -1,6 +1,8 @@
 import { gatewayBundle } from "./gateway-bundle.js";
 import { gatewayProfile } from "./gateway-service.js";
 
+const MAX_JSON_REQUEST_BYTES = 1_048_576;
+
 // Generated client surface for pwce-agent-gateway.v1@1.0.0.
 // Keep this transport-only: Lifestream owns its mapping and provider semantics.
 export class PwceAgentGatewayClient {
@@ -19,7 +21,13 @@ export class PwceAgentGatewayClient {
   }
 
   async #json(path, { method = "GET", body, signal } = {}) {
-    const response = await this.#fetch(`${this.#baseUrl}${path}`, { method, signal, headers: { Authorization: `Bearer ${this.#token}`, "Content-Type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+    const encodedBody = body === undefined ? undefined : JSON.stringify(body);
+    if (encodedBody !== undefined && Buffer.byteLength(encodedBody, "utf8") > MAX_JSON_REQUEST_BYTES) {
+      const error = new Error("request body exceeds the 1 MiB transport limit");
+      error.code = "limit_exceeded";
+      throw error;
+    }
+    const response = await this.#fetch(`${this.#baseUrl}${path}`, { method, signal, headers: { Authorization: `Bearer ${this.#token}`, "Content-Type": "application/json" }, ...(encodedBody === undefined ? {} : { body: encodedBody }) });
     const result = await response.json();
     if (!response.ok) {
       const error = new Error(result.error?.message ?? "gateway request failed");

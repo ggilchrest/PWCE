@@ -44,3 +44,13 @@ test("generated gateway client parses bounded invalidation SSE frames", async ()
     { id: "8", event: "resync.required", data: "{\"reason\":\"cursor_expired\"}" }
   ]);
 });
+
+test("generated gateway client rejects oversized JSON before transport", async () => {
+  const calls = [];
+  const client = new PwceAgentGatewayClient({ baseUrl: "http://pwce.local", token: "gateway-test-token", fetchImpl: async (url) => {
+    calls.push(url);
+    return new Response(JSON.stringify({ profileId: "pwce-agent-gateway.v1", profileVersion: "1.0.0", bundleId: "pwce-agent-gateway.bundle.v1", bundleVersion: "1.0.0", schemaStatus: "published", schemaDigest: "32c555ba675b61b4c1ec82245e314a8f6ca537484defbeb48b9fe1b6bdf4e2e2", operationCatalogVersion: "0.1.0", operationCatalogDigest: "445cb4e4b9811a26a41c5821c7d68b09f377b69d24d42ec6dcd0acec5d950b65" }), { status: 200 });
+  } });
+  await assert.rejects(() => client.authority({ siteRefs: ["home.one"], padding: "x".repeat(1_048_550) }), { code: "limit_exceeded" });
+  assert.deepEqual(calls, ["http://pwce.local/gateway/v1/profile"]);
+});
