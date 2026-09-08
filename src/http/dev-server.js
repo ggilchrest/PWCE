@@ -9,7 +9,7 @@ import { queryHistory, explainCurrent } from "../domain/query-service.js";
 import { createStudioService } from "../studio/studio-service.js";
 import { createStudioSessionRegistry, getStudioContext, parseCookies } from "./studio-auth.js";
 import { createGatewayHttpBinding } from "./gateway-server.js";
-import { MAX_TRANSPORT_BYTES, readJsonBody } from "./json-body.js";
+import { MAX_TRANSPORT_BYTES, readJsonBody, requireJsonContentType } from "./json-body.js";
 import { BasicAgent } from "../agent/basic-agent.js";
 import { SECURITY_HEADERS } from "./security-headers.js";
 
@@ -76,6 +76,8 @@ export async function createStudioHttpServer({ env = process.env, store, service
         const cookies = parseCookies(req.headers.cookie);
         const studioContext = getStudioContext({ authorization: req.headers.authorization, cookie: cookies.pwce_studio_session, configuredToken: configuredStudioToken, sessions, siteRefs: effectiveService.siteRefs });
         if (!studioContext) return json(res, configuredStudioToken ? 401 : 503, errorPayload(configuredStudioToken ? "studio_authentication_required" : "studio_token_not_configured", configuredStudioToken ? "authentication_required" : "configuration_unavailable"));
+        const jsonPost = req.method === "POST" && (url.pathname === "/api/agent/message" || url.pathname === "/api/actions/preview" || url.pathname === "/api/actions/dispatch" || url.pathname === "/api/approvals" || url.pathname.endsWith("/approve"));
+        if (jsonPost) requireJsonContentType(req);
         const requireSite = (siteRef) => { if (!studioContext.siteRefs.includes(siteRef)) { const error = new Error("site is outside Studio authority"); error.code = "scope_denied"; error.statusCode = 403; throw error; } };
         if (req.method === "GET" && url.pathname === "/api/health") return json(res, 200, { ...(await getHealth(effectiveStore)), runtime: effectiveService.runtimeStatus() });
         if (req.method === "GET" && url.pathname === "/api/sites") {

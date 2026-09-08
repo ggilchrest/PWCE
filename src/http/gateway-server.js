@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { GatewayService, gatewayProfile } from "../gateway/gateway-service.js";
 import { gatewayBundle } from "../gateway/gateway-bundle.js";
 import { validateAuthorityRequest } from "./gateway-contract.js";
-import { MAX_TRANSPORT_BYTES, readJsonBody } from "./json-body.js";
+import { MAX_TRANSPORT_BYTES, readJsonBody, requireJsonContentType } from "./json-body.js";
 import { SECURITY_HEADERS } from "./security-headers.js";
 
 function json(res, status, value) {
@@ -22,15 +22,6 @@ function gatewayError(code, message = code) {
 
 function bearer(req) {
   return req.headers.authorization?.startsWith("Bearer ") ? req.headers.authorization.slice("Bearer ".length) : null;
-}
-
-function requireJsonContentType(req) {
-  const contentType = req.headers["content-type"]?.split(";", 1)[0].trim().toLowerCase();
-  if (contentType !== "application/json") {
-    const error = new Error("gateway JSON requests require application/json content type");
-    error.code = "invalid_request";
-    throw error;
-  }
 }
 
 function sameSecret(left, right) {

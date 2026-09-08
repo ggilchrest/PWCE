@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { MAX_TRANSPORT_BYTES, readJsonBody } from "../src/http/json-body.js";
+import { MAX_TRANSPORT_BYTES, readJsonBody, requireJsonContentType } from "../src/http/json-body.js";
 
 function request(chunks, headers = {}) {
   return { headers, async *[Symbol.asyncIterator]() { for (const chunk of chunks) yield chunk; } };
@@ -18,4 +18,10 @@ test("shared JSON body reader rejects declared and actual oversized bodies", asy
 
 test("shared JSON body reader reports malformed JSON", async () => {
   await assert.rejects(() => readJsonBody(request(["not-json"])), { code: "invalid_request" });
+});
+
+test("shared JSON transport requires an application/json content type", () => {
+  requireJsonContentType(request([], { "content-type": "application/json; charset=utf-8" }));
+  assert.throws(() => requireJsonContentType(request([], { "content-type": "text/plain" })), { code: "invalid_request" });
+  assert.throws(() => requireJsonContentType(request([])), { code: "invalid_request" });
 });

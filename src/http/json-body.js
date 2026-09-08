@@ -1,5 +1,15 @@
 export const MAX_TRANSPORT_BYTES = 1_048_576;
 
+export function requireJsonContentType(req) {
+  const contentType = req.headers?.["content-type"]?.split(";", 1)[0].trim().toLowerCase()
+    ?? req.headers?.["Content-Type"]?.split(";", 1)[0].trim().toLowerCase();
+  if (contentType !== "application/json") {
+    const error = new Error("JSON requests require application/json content type");
+    error.code = "invalid_request";
+    throw error;
+  }
+}
+
 function limitError(message) {
   const error = new Error(message);
   error.code = "limit_exceeded";
