@@ -42,6 +42,8 @@ export function verifyPassword(password, stored) {
   }
 }
 
+const DUMMY_PASSWORD_HASH = hashPassword("pwce-dummy-password-for-timing-equivalence");
+
 export function generateRecoveryCodes(count = 10) {
   if (!Number.isInteger(count) || count < 1 || count > 32) throw invalid("recovery code count is outside the allowed range");
   return Array.from({ length: count }, () => randomBytes(10).toString("hex").toUpperCase());
@@ -67,7 +69,9 @@ export function createStudioAuthService({ store, clock = () => new Date() } = {}
     },
     async authenticate({ username, password } = {}) {
       const account = (await store.load()).studioAuth;
-      if (!account || typeof username !== "string" || username !== account.username || !verifyPassword(password, account.passwordHash)) return null;
+      const passwordHash = account?.passwordHash ?? DUMMY_PASSWORD_HASH;
+      const verified = verifyPassword(password, passwordHash);
+      if (!account || typeof username !== "string" || username !== account.username || !verified) return null;
       return { principalRef: account.principalRef, username: account.username, transport: "password" };
     },
     async authenticateRecovery({ code } = {}) {
@@ -105,7 +109,7 @@ export function createStudioSessionRegistry() {
     get(sessionRef) {
       const context = sessions.get(sessionRef);
       if (!context || new Date(context.expiresAt) <= new Date()) { if (sessionRef) sessions.delete(sessionRef); return null; }
-      return { ...context };
+      return { ...context, siteRefs: [...context.siteRefs] };
     },
     has(sessionRef) { return Boolean(this.get(sessionRef)); },
     revoke(sessionRef) { return sessions.delete(sessionRef); }

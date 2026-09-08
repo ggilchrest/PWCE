@@ -48,3 +48,13 @@ test("Studio local auth rejects weak passwords and duplicate recovery codes", as
   await assert.rejects(() => auth.initialize({ username: "dev", password: "too-short", recoveryCodes: ["ABCDEF0123456789"] }), { code: "invalid_request" });
   await assert.rejects(() => auth.initialize({ username: "dev", password: "a sufficiently long test password", recoveryCodes: ["ABCDEF0123456789", "ABC-DEF01 23456789"] }), { code: "invalid_request" });
 });
+
+test("Studio session scope returned to callers is isolated from registry state", () => {
+  const sessions = createStudioSessionRegistry();
+  const session = sessions.issue({ siteRefs: ["home.one", "home.two"] });
+  const context = sessions.get(session.sessionRef);
+  context.siteRefs.pop();
+  assert.deepEqual(sessions.get(session.sessionRef).siteRefs, ["home.one", "home.two"]);
+  assert.equal(sessions.revoke(session.sessionRef), true);
+  assert.equal(sessions.get(session.sessionRef), null);
+});
