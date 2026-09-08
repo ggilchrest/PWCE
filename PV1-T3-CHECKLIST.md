@@ -1,6 +1,6 @@
 # PWCE Personal V1 — PV1-T3 local evidence checklist
 
-Status: `in_progress`
+Status: `passed`
 
 | Check | Result | Evidence |
 |---|---|---|
