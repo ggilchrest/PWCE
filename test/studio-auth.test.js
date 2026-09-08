@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createStudioAuthService, createStudioSessionRegistry, generateRecoveryCodes, getStudioContext, hasStudioAuthority, parseCookies } from "../src/http/studio-auth.js";
+import { createStudioAuthService, createStudioSessionRegistry, generateRecoveryCodes, getStudioContext, hasStudioAuthority, isAllowedStudioOrigin, parseCookies } from "../src/http/studio-auth.js";
 import { StateStore, emptyState } from "../src/runtime/state-store.js";
 
 test("Studio accepts the configured bearer token and rejects other tokens", () => {
@@ -57,4 +57,11 @@ test("Studio session scope returned to callers is isolated from registry state",
   assert.deepEqual(sessions.get(session.sessionRef).siteRefs, ["home.one", "home.two"]);
   assert.equal(sessions.revoke(session.sessionRef), true);
   assert.equal(sessions.get(session.sessionRef), null);
+});
+
+test("Studio accepts same-origin or absent Origin and rejects cross-origin mutations", () => {
+  assert.equal(isAllowedStudioOrigin(undefined, "127.0.0.1:4173"), true);
+  assert.equal(isAllowedStudioOrigin("http://127.0.0.1:4173", "127.0.0.1:4173"), true);
+  assert.equal(isAllowedStudioOrigin("http://evil.example", "127.0.0.1:4173"), false);
+  assert.equal(isAllowedStudioOrigin("not-an-origin", "127.0.0.1:4173"), false);
 });

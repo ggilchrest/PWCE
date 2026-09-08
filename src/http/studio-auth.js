@@ -97,6 +97,16 @@ export function parseCookies(header = "") {
   return Object.fromEntries(header.split(";").map((part) => part.trim().split("=")).filter(([key, value]) => key && value).map(([key, ...value]) => [key, decodeURIComponent(value.join("="))]));
 }
 
+export function isAllowedStudioOrigin(origin, host) {
+  if (!origin) return true;
+  try {
+    const parsed = new URL(origin);
+    return parsed.protocol === "http:" && parsed.host === host;
+  } catch {
+    return false;
+  }
+}
+
 export function createStudioSessionRegistry() {
   const sessions = new Map();
   return {

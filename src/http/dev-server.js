@@ -7,7 +7,7 @@ import { getHealth } from "../runtime/health.js";
 import { getCurrent, getCurrentAggregate } from "../domain/observation-service.js";
 import { queryHistory, explainCurrent } from "../domain/query-service.js";
 import { createStudioService } from "../studio/studio-service.js";
-import { createStudioAuthService, createStudioSessionRegistry, getStudioContext, parseCookies } from "./studio-auth.js";
+import { createStudioAuthService, createStudioSessionRegistry, getStudioContext, isAllowedStudioOrigin, parseCookies } from "./studio-auth.js";
 import { createGatewayHttpBinding } from "./gateway-server.js";
 import { MAX_TRANSPORT_BYTES, readJsonObjectBody, requireJsonContentType } from "./json-body.js";
 import { BasicAgent } from "../agent/basic-agent.js";
@@ -106,6 +106,7 @@ export async function createStudioHttpServer({ env = process.env, store, service
         }
         if (req.method === "POST" && url.pathname === "/api/session/logout") {
           const cookies = parseCookies(req.headers.cookie);
+          if (cookies.pwce_studio_session && !isAllowedStudioOrigin(req.headers.origin, req.headers.host)) return json(res, 403, errorPayload("studio_origin_not_allowed", "origin_denied"));
           sessions.revoke(cookies.pwce_studio_session);
           res.writeHead(200, { ...SECURITY_HEADERS, "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "set-cookie": ["pwce_studio_session=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/"] });
           return res.end(JSON.stringify({ authenticated: false }));
@@ -113,6 +114,7 @@ export async function createStudioHttpServer({ env = process.env, store, service
         const cookies = parseCookies(req.headers.cookie);
         const studioContext = getStudioContext({ authorization: req.headers.authorization, cookie: cookies.pwce_studio_session, configuredToken: configuredStudioToken, sessions, siteRefs: effectiveService.siteRefs });
         if (!studioContext) return json(res, configuredStudioToken ? 401 : 503, errorPayload(configuredStudioToken ? "studio_authentication_required" : "studio_token_not_configured", configuredStudioToken ? "authentication_required" : "configuration_unavailable"));
+        if (req.method === "POST" && cookies.pwce_studio_session && !isAllowedStudioOrigin(req.headers.origin, req.headers.host)) return json(res, 403, errorPayload("studio_origin_not_allowed", "origin_denied"));
         const jsonPost = req.method === "POST" && (url.pathname === "/api/agent/message" || url.pathname === "/api/actions/preview" || url.pathname === "/api/actions/dispatch" || url.pathname === "/api/approvals" || url.pathname.endsWith("/approve"));
         if (jsonPost) requireJsonContentType(req);
         const requireSite = (siteRef) => { if (!studioContext.siteRefs.includes(siteRef)) { const error = new Error("site is outside Studio authority"); error.code = "scope_denied"; error.statusCode = 403; throw error; } };
