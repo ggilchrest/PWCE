@@ -24,6 +24,15 @@ function bearer(req) {
   return req.headers.authorization?.startsWith("Bearer ") ? req.headers.authorization.slice("Bearer ".length) : null;
 }
 
+function requireJsonContentType(req) {
+  const contentType = req.headers["content-type"]?.split(";", 1)[0].trim().toLowerCase();
+  if (contentType !== "application/json") {
+    const error = new Error("gateway JSON requests require application/json content type");
+    error.code = "invalid_request";
+    throw error;
+  }
+}
+
 function sameSecret(left, right) {
   if (typeof left !== "string" || typeof right !== "string") return false;
   const a = Buffer.from(left); const b = Buffer.from(right);
@@ -90,6 +99,7 @@ export function createGatewayHttpBinding({ store, token, principalRef = "agent.f
       }
       if (req.method !== "POST") { json(res, 405, gatewayError("method_not_allowed")); return true; }
       try {
+        requireJsonContentType(req);
         if (pathname === "/gateway/v1/authority") {
           if (!sameSecret(presentedToken, token)) throw new Error("authentication failed");
           const payload = validateAuthorityRequest(await readJsonBody(req));

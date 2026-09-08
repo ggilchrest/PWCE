@@ -11,7 +11,7 @@ function store() {
 async function invoke(binding, { pathname, method = "GET", authorization, payload, contentLength } = {}) {
   let status; let responseHeaders; let value; const chunks = [];
   const parsed = new URL(pathname, "http://127.0.0.1");
-  const req = { method, url: `${parsed.pathname}${parsed.search}`, headers: { authorization, ...(contentLength === undefined ? {} : { "content-length": String(contentLength) }) }, async *[Symbol.asyncIterator]() { if (payload) yield JSON.stringify(payload); } };
+  const req = { method, url: `${parsed.pathname}${parsed.search}`, headers: { authorization, ...(payload ? { "content-type": "application/json" } : {}), ...(contentLength === undefined ? {} : { "content-length": String(contentLength) }) }, async *[Symbol.asyncIterator]() { if (payload) yield JSON.stringify(payload); } };
   const res = { writeHead(code, headers) { status = code; responseHeaders = headers; }, write(text) { chunks.push(text); }, end(text) { value = text ? JSON.parse(text) : chunks.join(""); } };
   await binding.handle(req, res, parsed.pathname);
   return { status, responseHeaders, value };
@@ -108,6 +108,17 @@ test("HTTP authority rejects payloads outside the published request schema", asy
   const duplicate = await invoke(binding, { pathname: "/gateway/v1/authority", method: "POST", authorization, payload: { siteRefs: ["home.one", "home.one"] } });
   assert.equal(duplicate.status, 400);
   assert.equal(duplicate.value.error.code, "invalid_request");
+});
+
+test("HTTP gateway rejects JSON POSTs without an application/json content type", async () => {
+  const binding = createGatewayHttpBinding({ store: store(), token: "gateway-test-token", siteRefs: ["home.one"] });
+  const parsed = new URL("/gateway/v1/authority", "http://127.0.0.1");
+  let status; let value;
+  const req = { method: "POST", url: parsed.pathname, headers: { authorization: "Bearer gateway-test-token", "content-type": "text/plain" }, async *[Symbol.asyncIterator]() { yield JSON.stringify({ siteRefs: ["home.one"] }); } };
+  const res = { writeHead(code) { status = code; }, end(text) { value = JSON.parse(text); } };
+  await binding.handle(req, res, parsed.pathname);
+  assert.equal(status, 400);
+  assert.equal(value.error.code, "invalid_request");
 });
 
 test("HTTP gateway rejects request bodies over the shared transport limit", async () => {
