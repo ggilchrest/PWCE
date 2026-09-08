@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { GatewayService, gatewayProfile } from "../gateway/gateway-service.js";
 import { gatewayBundle } from "../gateway/gateway-bundle.js";
+import { validateAuthorityRequest } from "./gateway-contract.js";
 
 function json(res, status, value) {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
@@ -76,7 +77,7 @@ export function createGatewayHttpBinding({ store, token, principalRef = "agent.f
       try {
         if (pathname === "/gateway/v1/authority") {
           if (!sameSecret(presentedToken, token)) throw new Error("authentication failed");
-          const payload = await body(req);
+          const payload = validateAuthorityRequest(await body(req));
           return json(res, 201, gateway.issueAuthorityContext({ principalRef, token: presentedToken, siteRefs: payload.siteRefs, ttlMs: payload.ttlMs, assistantRef: payload.assistantRef, endpointRef: payload.endpointRef, participantRefs: payload.participantRefs, audienceRef: payload.audienceRef })), true;
         }
         if (pathname === "/gateway/v1/request") {

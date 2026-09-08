@@ -95,6 +95,17 @@ test("HTTP authority preserves optional identity isolation fields", async () => 
   assert.equal(denied.value.error.code, "scope_denied");
 });
 
+test("HTTP authority rejects payloads outside the published request schema", async () => {
+  const binding = createGatewayHttpBinding({ store: store(), token: "gateway-test-token", siteRefs: ["home.one"] });
+  const authorization = "Bearer gateway-test-token";
+  const unknown = await invoke(binding, { pathname: "/gateway/v1/authority", method: "POST", authorization, payload: { siteRefs: ["home.one"], secret: "ignored-must-not-be-accepted" } });
+  assert.equal(unknown.status, 400);
+  assert.equal(unknown.value.error.code, "invalid_request");
+  const duplicate = await invoke(binding, { pathname: "/gateway/v1/authority", method: "POST", authorization, payload: { siteRefs: ["home.one", "home.one"] } });
+  assert.equal(duplicate.status, 400);
+  assert.equal(duplicate.value.error.code, "invalid_request");
+});
+
 test("fixture external Agent uses only the gateway HTTP contract", async () => {
   const calls = [];
   const responses = [
