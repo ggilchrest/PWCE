@@ -25,7 +25,9 @@ function sameSecret(left, right) {
 }
 
 function authError(error) {
-  return ["authentication_failed", "authority_context_expired", "authority_context_invalidated"].includes(error.code) || /authentication|authority context/i.test(error.message) ? 401 : 400;
+  if (["authentication_failed", "authority_context_expired", "authority_context_invalidated"].includes(error.code) || error.code === undefined && /authentication failed|authority context expired|authority context invalidated/i.test(error.message)) return 401;
+  if (["scope_denied", "authority_scope_denied"].includes(error.code)) return 403;
+  return 400;
 }
 
 function sse(res, result) {
@@ -75,7 +77,7 @@ export function createGatewayHttpBinding({ store, token, principalRef = "agent.f
         if (pathname === "/gateway/v1/authority") {
           if (!sameSecret(presentedToken, token)) throw new Error("authentication failed");
           const payload = await body(req);
-          return json(res, 201, gateway.issueAuthorityContext({ principalRef, token: presentedToken, siteRefs: payload.siteRefs, ttlMs: payload.ttlMs })), true;
+          return json(res, 201, gateway.issueAuthorityContext({ principalRef, token: presentedToken, siteRefs: payload.siteRefs, ttlMs: payload.ttlMs, assistantRef: payload.assistantRef, endpointRef: payload.endpointRef, participantRefs: payload.participantRefs, audienceRef: payload.audienceRef })), true;
         }
         if (pathname === "/gateway/v1/request") {
           const payload = await body(req);

@@ -77,6 +77,24 @@ test("authenticated HTTP binding delegates every callable catalog operation", as
   assert.equal(trusted.value.error.code, "trusted_dispatch_only");
 });
 
+test("HTTP authority preserves optional identity isolation fields", async () => {
+  const binding = createGatewayHttpBinding({ store: store(), token: "gateway-test-token", siteRefs: ["home.one"] });
+  const authorization = "Bearer gateway-test-token";
+  const authorityResponse = await invoke(binding, {
+    pathname: "/gateway/v1/authority",
+    method: "POST",
+    authorization,
+    payload: { siteRefs: ["home.one"], assistantRef: "assistant.one", endpointRef: "endpoint.studio", participantRefs: ["participant.owner"], audienceRef: "audience.private" }
+  });
+  assert.equal(authorityResponse.status, 201);
+  const authorityContextRef = authorityResponse.value.authorityContextRef;
+  const accepted = await invoke(binding, { pathname: "/gateway/v1/request", method: "POST", authorization, payload: { operation: "health.get", authorityContextRef, assistantRef: "assistant.one", endpointRef: "endpoint.studio", participantRefs: ["participant.owner"], audienceRef: "audience.private" } });
+  assert.equal(accepted.status, 200);
+  const denied = await invoke(binding, { pathname: "/gateway/v1/request", method: "POST", authorization, payload: { operation: "health.get", authorityContextRef, assistantRef: "assistant.other", endpointRef: "endpoint.studio", participantRefs: ["participant.owner"], audienceRef: "audience.private" } });
+  assert.equal(denied.status, 403);
+  assert.equal(denied.value.error.code, "scope_denied");
+});
+
 test("fixture external Agent uses only the gateway HTTP contract", async () => {
   const calls = [];
   const responses = [
