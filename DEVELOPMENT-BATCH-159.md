@@ -10,6 +10,7 @@ PWCE now has authenticated read-only synchronization evidence for both separatel
 - Authenticated `/api/config` and `/api/states` reads returned `200` from the second Home Assistant instance.
 - PWCE startup sync with `PWCE_STUDIO_SYNC_ON_START=true` and `PWCE_STUDIO_LIVE_EVENTS=false` reported both sources as `online` with `state_synced`.
 - The resulting observations were qualified as `home.one::light.kitchen_lights` and `home.two::light.kitchen_lights`.
+- An authenticated `context.query` through the PWCE gateway returned exactly two current items, one for each site, with the limitation that values remain site-qualified and are not merged.
 
 ## Boundary
 
