@@ -106,6 +106,13 @@ test("HTTP authority rejects payloads outside the published request schema", asy
   assert.equal(duplicate.value.error.code, "invalid_request");
 });
 
+test("HTTP gateway rejects request bodies over the shared transport limit", async () => {
+  const binding = createGatewayHttpBinding({ store: store(), token: "gateway-test-token", siteRefs: ["home.one"] });
+  const response = await invoke(binding, { pathname: "/gateway/v1/authority", method: "POST", authorization: "Bearer gateway-test-token", payload: { siteRefs: ["home.one"], padding: "x".repeat(1_048_550) } });
+  assert.equal(response.status, 400);
+  assert.equal(response.value.error.code, "limit_exceeded");
+});
+
 test("fixture external Agent uses only the gateway HTTP contract", async () => {
   const calls = [];
   const responses = [

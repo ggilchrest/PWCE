@@ -8,11 +8,26 @@ function json(res, status, value) {
   res.end(JSON.stringify(value));
 }
 
+const MAX_REQUEST_BYTES = 1_048_576;
+
 async function body(req) {
   let text = "";
-  for await (const chunk of req) text += chunk;
+  let byteLength = 0;
+  for await (const chunk of req) {
+    byteLength += Buffer.byteLength(chunk);
+    if (byteLength > MAX_REQUEST_BYTES) {
+      const error = new Error("request body exceeds the 1 MiB transport limit");
+      error.code = "limit_exceeded";
+      throw error;
+    }
+    text += chunk;
+  }
   if (!text) return {};
-  try { return JSON.parse(text); } catch { throw new Error("request body must be valid JSON"); }
+  try { return JSON.parse(text); } catch {
+    const error = new Error("request body must be valid JSON");
+    error.code = "invalid_request";
+    throw error;
+  }
 }
 
 function bearer(req) {
