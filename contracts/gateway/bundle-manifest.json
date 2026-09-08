@@ -16,5 +16,5 @@
     { "path": "contracts/gateway/pwce-agent-gateway-authority-request.schema.json", "sha256": "c88e5eb7bb98c867ed5e0a2bf71c4e58f012aa068ecd8fc93cd40caecc42b318" },
     { "path": "contracts/gateway/pwce-agent-gateway-authority-response.schema.json", "sha256": "b064fc855886a63beb7ca934cdef8f2c51a20e9244c399a0d19afeb635a2c82f" }
   ],
-  "generatedClient": { "path": "src/gateway/generated-client.js", "status": "checked_in", "sha256": "02f5b29bd1a04b8ad602d0d4986bd5c65bc599bb3b7cd1902d97a5224262c3f2" }
+  "generatedClient": { "path": "src/gateway/generated-client.js", "status": "checked_in", "sha256": "aaf6798c62eeb80d023a78a038a17e96c61a3fa79b54295e5b0ec4ec6a2a48f6" }
 }

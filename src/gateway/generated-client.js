@@ -40,6 +40,11 @@ export class PwceAgentGatewayClient {
       error.code = "invalid_gateway_response";
       throw error;
     }
+    if (result === null || typeof result !== "object" || Array.isArray(result)) {
+      const error = new Error("gateway returned an invalid JSON response");
+      error.code = "invalid_gateway_response";
+      throw error;
+    }
     if (!response.ok) {
       const error = new Error(result.error?.message ?? "gateway request failed");
       error.code = result.error?.code ?? "gateway_request_failed";
