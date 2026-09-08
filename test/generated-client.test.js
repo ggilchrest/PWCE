@@ -72,3 +72,12 @@ test("generated gateway client rejects oversized JSON responses", async () => {
   const client = new PwceAgentGatewayClient({ baseUrl: "http://pwce.local", token: "gateway-test-token", fetchImpl: async () => new Response("x".repeat(1_048_577), { status: 200 }) });
   await assert.rejects(() => client.profile(), { code: "limit_exceeded" });
 });
+
+test("generated gateway client rejects an oversized unterminated SSE frame", async () => {
+  const client = new PwceAgentGatewayClient({ baseUrl: "http://pwce.local", token: "gateway-test-token", fetchImpl: async (url) => {
+    if (url.endsWith("/profile")) return new Response(JSON.stringify({ profileId: "pwce-agent-gateway.v1", profileVersion: "1.0.0", bundleId: "pwce-agent-gateway.bundle.v1", bundleVersion: "1.0.0", schemaStatus: "published", schemaDigest: "32c555ba675b61b4c1ec82245e314a8f6ca537484defbeb48b9fe1b6bdf4e2e2", operationCatalogVersion: "0.1.0", operationCatalogDigest: "445cb4e4b9811a26a41c5821c7d68b09f377b69d24d42ec6dcd0acec5d950b65" }), { status: 200 });
+    return new Response("data: " + "x".repeat(1_048_571), { status: 200, headers: { "content-type": "text/event-stream" } });
+  } });
+  const iterator = client.subscribeInvalidations({ authorityContextRef: "authority.fixture", siteRef: "home.one" });
+  await assert.rejects(() => iterator.next(), { code: "limit_exceeded" });
+});

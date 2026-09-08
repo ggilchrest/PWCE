@@ -1,7 +1,7 @@
 import { gatewayBundle } from "./gateway-bundle.js";
 import { gatewayProfile } from "./gateway-service.js";
 
-const MAX_JSON_REQUEST_BYTES = 1_048_576;
+const MAX_TRANSPORT_BYTES = 1_048_576;
 
 // Generated client surface for pwce-agent-gateway.v1@1.0.0.
 // Keep this transport-only: Lifestream owns its mapping and provider semantics.
@@ -22,14 +22,14 @@ export class PwceAgentGatewayClient {
 
   async #json(path, { method = "GET", body, signal } = {}) {
     const encodedBody = body === undefined ? undefined : JSON.stringify(body);
-    if (encodedBody !== undefined && Buffer.byteLength(encodedBody, "utf8") > MAX_JSON_REQUEST_BYTES) {
+    if (encodedBody !== undefined && Buffer.byteLength(encodedBody, "utf8") > MAX_TRANSPORT_BYTES) {
       const error = new Error("request body exceeds the 1 MiB transport limit");
       error.code = "limit_exceeded";
       throw error;
     }
     const response = await this.#fetch(`${this.#baseUrl}${path}`, { method, signal, headers: { Authorization: `Bearer ${this.#token}`, "Content-Type": "application/json" }, ...(encodedBody === undefined ? {} : { body: encodedBody }) });
     const responseBytes = await response.arrayBuffer();
-    if (responseBytes.byteLength > MAX_JSON_REQUEST_BYTES) {
+    if (responseBytes.byteLength > MAX_TRANSPORT_BYTES) {
       const error = new Error("response body exceeds the 1 MiB transport limit");
       error.code = "limit_exceeded";
       throw error;
@@ -124,6 +124,11 @@ export class PwceAgentGatewayClient {
       while (true) {
         const chunk = await reader.read();
         buffer += decoder.decode(chunk.value ?? new Uint8Array(), { stream: !chunk.done });
+        if (Buffer.byteLength(buffer, "utf8") > MAX_TRANSPORT_BYTES) {
+          const error = new Error("event stream frame exceeds the 1 MiB transport limit");
+          error.code = "limit_exceeded";
+          throw error;
+        }
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
         for (const rawLine of lines) {
