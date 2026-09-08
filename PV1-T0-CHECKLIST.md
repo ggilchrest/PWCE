@@ -10,6 +10,7 @@ This checklist records the contract-foundation evidence. Later-tier implementati
 | Shared envelope positive and negative vectors execute | `pass` | `npm test` — 4 tests passed |
 | Producer integrity vectors execute | `pass` | `npm test` — positive, tampered, and malformed-envelope vectors passed |
 | Contract-pack byte digests match the supplied Draft manifest | `pass` | `npm run validate` — 3 manifest checks and 13 fixture vectors passed |
+| Local Studio Human authentication boundary | `pass` | `src/http/studio-auth.js`; `src/http/dev-server.js`; `test/studio-auth.test.js`; live HTTP smoke recorded in `DEVELOPMENT-BATCH-149.md` |
 | Database migrations | `not_applicable` | No database is introduced in PV1-T0 |
 | Home Assistant fixture or real adapter | `pass` | `PV1-T1-CHECKLIST.md`; `test/adapter-and-query.test.js`; `test/real-boundaries.test.js` |
 | Gateway compatibility | `pass` | `PV1-T3-CHECKLIST.md`; `test/gateway-service.test.js`; `test/gateway-http.test.js` |

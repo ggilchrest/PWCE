@@ -7,6 +7,8 @@ The development environment template now exposes the local Studio username, pass
 ## Evidence
 
 - `.env.example` lists the three Human-auth configuration variables and warns that recovery codes stay offline.
+- `npm run studio:generate-recovery-codes [count]` prints a fresh batch without reading or writing credentials or application state.
+- `docs/user-docs/manual/inspect-local-context.html`, `docs/user-docs/qa/inspect-local-context.html`, and the linked release note describe the command and recovery flow.
 - The prior local Studio authentication tests and documentation remain green.
 
 ## Boundary
