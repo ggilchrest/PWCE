@@ -38,6 +38,7 @@ test("authenticated gateway HTTP binding issues authority and delegates requests
   assert.equal(profile.responseHeaders["x-content-type-options"], "nosniff");
   assert.equal(profile.responseHeaders["referrer-policy"], "no-referrer");
   assert.match(profile.responseHeaders["content-security-policy"], /frame-ancestors 'none'/);
+  assert.equal(profile.responseHeaders.vary, "Authorization, Cookie");
   assert.equal(profile.value.compatibilityRange.minimum, "1.0.0");
   const authorityResponse = await invoke(binding, { pathname: "/gateway/v1/authority", method: "POST", authorization: "Bearer gateway-test-token", payload: { siteRefs: ["home.one"] } });
   assert.equal(authorityResponse.status, 201);
