@@ -128,6 +128,14 @@ test("HTTP gateway rejects oversized response bodies", async () => {
   assert.equal(response.value.error.code, "limit_exceeded");
 });
 
+test("HTTP gateway rejects an oversized initial SSE frame", async () => {
+  const gateway = { registerPrincipal() {}, async requestAuthenticated() { return { events: [{ cursor: "1", type: "context.invalidated", payload: "x".repeat(1_048_500) }] }; } };
+  const binding = createGatewayHttpBinding({ store: store(), token: "gateway-test-token", gateway });
+  const response = await invoke(binding, { pathname: "/gateway/v1/events?authorityContextRef=authority.fixture&siteRef=home.one", authorization: "Bearer gateway-test-token" });
+  assert.equal(response.status, 400);
+  assert.equal(response.value.error.code, "limit_exceeded");
+});
+
 test("fixture external Agent uses only the gateway HTTP contract", async () => {
   const calls = [];
   const responses = [

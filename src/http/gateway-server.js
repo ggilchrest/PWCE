@@ -59,8 +59,18 @@ function authError(error) {
 }
 
 function sse(res, result) {
+  const frameFor = (event) => `id: ${event.cursor}\nevent: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
+  if (result.events.some((event) => Buffer.byteLength(frameFor(event), "utf8") > MAX_REQUEST_BYTES)) {
+    const error = new Error("event stream frame exceeds the 1 MiB transport limit");
+    error.code = "limit_exceeded";
+    throw error;
+  }
   res.writeHead(200, { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-store", connection: "keep-alive" });
-  const writeEvent = (event) => res.write(`id: ${event.cursor}\nevent: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+  const writeEvent = (event) => {
+    const frame = frameFor(event);
+    if (Buffer.byteLength(frame, "utf8") > MAX_REQUEST_BYTES) { res.end(); return; }
+    return res.write(frame);
+  };
   if (result.resyncRequired) res.write("event: resync.required\ndata: {\"reason\":\"cursor_expired\"}\n\n");
   for (const event of result.events) writeEvent(event);
   res.write(": gateway-replay\n\n");
