@@ -65,6 +65,16 @@ test("persists an unknown outcome when the target throws during dispatch", async
   assert.equal((await actions.getInvocation(admitted.action.actionRef)).status, "outcome_unknown");
 });
 
+test("persists an unknown outcome when the target returns a malformed result", async () => {
+  const target = { async invoke() { return null; } };
+  const { actions } = service("normal", target);
+  const admitted = await actions.authorizeDispatch(request({ idempotencyKey: "target-malformed-001" }));
+  const result = await actions.dispatch(admitted.action.actionRef);
+  assert.equal(result.status, "outcome_unknown");
+  assert.equal(result.result.externalEffectOccurred, "unknown");
+  assert.equal(result.result.reasonCode, "target_invalid_result");
+});
+
 test("denies missing grants, invalid parameters, and missing idempotency", async () => {
   const { actions } = service();
   assert.deepEqual(actions.preview(request({ principalRef: "agent.other" })).rationaleCodes, ["grant_missing"]);

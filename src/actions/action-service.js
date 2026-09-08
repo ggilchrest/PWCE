@@ -4,6 +4,14 @@ import { canonicalize } from "../contract-foundation/canonical-json.js";
 const capabilities = new Map([
   ["home.light.set_level", { capabilityRef: "home.light.set_level", operation: "light.set_level", effectClass: "reversible", approval: "policy", idempotency: "required", offline: "fixture_only", schemaVersion: "1.0.0" }]
 ]);
+const terminalActionStatuses = new Set(["succeeded", "partially_succeeded", "failed", "rejected", "denied", "timed_out", "cancelled", "outcome_unknown"]);
+
+function normalizeTargetResult(result) {
+  if (!result || typeof result !== "object" || Array.isArray(result) || !terminalActionStatuses.has(result.status) || ![true, false, "unknown"].includes(result.externalEffectOccurred)) {
+    return { status: "outcome_unknown", externalEffectOccurred: "unknown", reasonCode: "target_invalid_result" };
+  }
+  return result;
+}
 
 function requestFingerprint(request) {
   return canonicalize({ principalRef: request.principalRef ?? null, capabilityRef: request.capabilityRef, capabilityVersion: request.capabilityVersion ?? null, operation: request.operation, siteRef: request.siteRef, targetEntityId: request.targetEntityId, parameters: request.parameters });
@@ -131,7 +139,7 @@ export class ActionService {
     const state = await this.#store.load();
     const action = state.actions[actionRef];
     if (!action) throw new Error("action not found");
-    if (action.status === "succeeded" || action.status === "failed" || action.status === "timed_out" || action.status === "outcome_unknown") return action;
+    if (terminalActionStatuses.has(action.status)) return action;
     const grant = this.#grants.get(action.principalRef);
     const capability = capabilityFor(action);
     if (!grant || !capability || action.grantRevision !== grant.revision || action.capabilityVersion !== capability.schemaVersion || !grant.siteRefs.has(action.siteRef) || !grant.capabilityRefs.has(action.capabilityRef)) {
@@ -151,6 +159,7 @@ export class ActionService {
     } catch {
       targetResult = { status: "outcome_unknown", externalEffectOccurred: "unknown", reasonCode: "target_invocation_failed" };
     }
+    targetResult = normalizeTargetResult(targetResult);
     const updated = await this.#store.transaction((next) => {
       const current = next.actions[actionRef];
       current.status = targetResult.status;
