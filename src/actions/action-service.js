@@ -145,7 +145,12 @@ export class ActionService {
       });
       return denied.result.result;
     }
-    const targetResult = await this.#target.invoke(action);
+    let targetResult;
+    try {
+      targetResult = await this.#target.invoke(action);
+    } catch {
+      targetResult = { status: "outcome_unknown", externalEffectOccurred: "unknown", reasonCode: "target_invocation_failed" };
+    }
     const updated = await this.#store.transaction((next) => {
       const current = next.actions[actionRef];
       current.status = targetResult.status;

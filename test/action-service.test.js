@@ -54,6 +54,17 @@ test("preserves timeout and unknown outcomes without claiming success", async ()
   assert.equal((await unknown.actions.dispatch(admittedUnknown.action.actionRef)).status, "outcome_unknown");
 });
 
+test("persists an unknown outcome when the target throws during dispatch", async () => {
+  const target = { async invoke() { throw new Error("transport timed out"); } };
+  const { actions } = service("normal", target);
+  const admitted = await actions.authorizeDispatch(request({ idempotencyKey: "target-throw-001" }));
+  const result = await actions.dispatch(admitted.action.actionRef);
+  assert.equal(result.status, "outcome_unknown");
+  assert.equal(result.result.externalEffectOccurred, "unknown");
+  assert.equal(result.result.reasonCode, "target_invocation_failed");
+  assert.equal((await actions.getInvocation(admitted.action.actionRef)).status, "outcome_unknown");
+});
+
 test("denies missing grants, invalid parameters, and missing idempotency", async () => {
   const { actions } = service();
   assert.deepEqual(actions.preview(request({ principalRef: "agent.other" })).rationaleCodes, ["grant_missing"]);
