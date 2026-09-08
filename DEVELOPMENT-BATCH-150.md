@@ -11,4 +11,4 @@ The development environment template now exposes the local Studio username, pass
 
 ## Boundary
 
-The template contains no credential values. It does not generate, rotate, or deliver recovery codes.
+The template contains no credential values. The generator prints codes only; it does not persist, rotate, or deliver them.
