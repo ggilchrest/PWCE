@@ -16,6 +16,12 @@ test("shared JSON body reader rejects declared and actual oversized bodies", asy
   await assert.rejects(() => readJsonBody(request(["x".repeat(MAX_TRANSPORT_BYTES + 1)])), { code: "limit_exceeded" });
 });
 
+test("shared JSON body reader rejects invalid or mismatched content length", async () => {
+  await assert.rejects(() => readJsonBody(request(["{}"], { "content-length": "nope" })), { code: "invalid_request" });
+  await assert.rejects(() => readJsonBody(request(["{}"], { "content-length": "1" })), { code: "invalid_request", message: "content-length does not match request body" });
+  await assert.rejects(() => readJsonBody(request(["{}"], { "content-length": "3" })), { code: "invalid_request", message: "content-length does not match request body" });
+});
+
 test("shared JSON body reader reports malformed JSON", async () => {
   await assert.rejects(() => readJsonBody(request(["not-json"])), { code: "invalid_request" });
 });

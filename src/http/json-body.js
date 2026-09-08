@@ -17,8 +17,14 @@ function limitError(message) {
 }
 
 export async function readJsonBody(req) {
-  const declaredLength = Number(req.headers?.["content-length"] ?? req.headers?.["Content-Length"]);
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_TRANSPORT_BYTES) throw limitError("request body exceeds the 1 MiB transport limit");
+  const declaredHeader = req.headers?.["content-length"] ?? req.headers?.["Content-Length"];
+  const declaredLength = declaredHeader === undefined ? null : Number(declaredHeader);
+  if (declaredLength !== null && (!Number.isInteger(declaredLength) || declaredLength < 0)) {
+    const error = new Error("content-length must be a non-negative integer");
+    error.code = "invalid_request";
+    throw error;
+  }
+  if (declaredLength !== null && declaredLength > MAX_TRANSPORT_BYTES) throw limitError("request body exceeds the 1 MiB transport limit");
   let text = "";
   let byteLength = 0;
   try {
@@ -30,6 +36,11 @@ export async function readJsonBody(req) {
   } catch (cause) {
     if (cause?.code === "limit_exceeded") throw cause;
     const error = new Error("request body was unavailable", { cause });
+    error.code = "invalid_request";
+    throw error;
+  }
+  if (declaredLength !== null && declaredLength !== byteLength) {
+    const error = new Error("content-length does not match request body");
     error.code = "invalid_request";
     throw error;
   }
