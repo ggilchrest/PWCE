@@ -50,6 +50,33 @@ test("authenticated gateway HTTP binding issues authority and delegates requests
   assert.equal(invalidEvents.status, 401);
 });
 
+test("authenticated HTTP binding delegates every callable catalog operation", async () => {
+  const binding = createGatewayHttpBinding({ store: store(), token: "gateway-test-token", siteRefs: ["home.one"] });
+  const authorization = "Bearer gateway-test-token";
+  const authorityResponse = await invoke(binding, { pathname: "/gateway/v1/authority", method: "POST", authorization, payload: { siteRefs: ["home.one"] } });
+  const authorityContextRef = authorityResponse.value.authorityContextRef;
+  const requests = [
+    { operation: "context.getPreparedInputs", siteRef: "home.one" },
+    { operation: "context.query", mode: "search", siteRef: "home.one", text: "light" },
+    { operation: "evidence.get", evidenceRef: "missing-evidence" },
+    { operation: "events.subscribe", siteRef: "home.one" },
+    { operation: "authority.evaluate", capabilityRef: "home.light.set_level", siteRef: "home.one" },
+    { operation: "authority.getGrants" },
+    { operation: "capabilities.getSnapshot" },
+    { operation: "capabilities.invoke", capabilityRef: "home.light.set_level", siteRef: "home.one", idempotencyKey: "http-catalog-test" },
+    { operation: "capabilities.getInvocation", actionRef: "missing-action" },
+    { operation: "trace.publish", traceNamespace: "lifestream.http", events: [{ eventRef: "trace-http-1", kind: "assistant.output" }] },
+    { operation: "health.get" }
+  ];
+  for (const payload of requests) {
+    const response = await invoke(binding, { pathname: "/gateway/v1/request", method: "POST", authorization, payload: { ...payload, authorityContextRef } });
+    assert.notEqual(response.status, 404, `${payload.operation} must be delegated, not routed as missing`);
+    assert.notEqual(response.value?.error?.code, "unsupported_operation", `${payload.operation} must be implemented or explicitly governed`);
+  }
+  const trusted = await invoke(binding, { pathname: "/gateway/v1/request", method: "POST", authorization, payload: { operation: "authority.authorizeDispatch", authorityContextRef } });
+  assert.equal(trusted.value.error.code, "trusted_dispatch_only");
+});
+
 test("fixture external Agent uses only the gateway HTTP contract", async () => {
   const calls = [];
   const responses = [
