@@ -26,6 +26,11 @@ test("generated gateway client preserves typed static transport errors", async (
   await assert.rejects(() => client.profile(), { code: "authentication_failed" });
 });
 
+test("generated gateway client types malformed JSON responses", async () => {
+  const client = new PwceAgentGatewayClient({ baseUrl: "http://pwce.local", token: "gateway-test-token", fetchImpl: async () => new Response("not-json", { status: 200 }) });
+  await assert.rejects(() => client.profile(), { code: "invalid_gateway_response" });
+});
+
 test("generated gateway client negotiates before issuing authority", async () => {
   const paths = [];
   const client = new PwceAgentGatewayClient({ baseUrl: "http://pwce.local", token: "gateway-test-token", fetchImpl: async (url) => {
