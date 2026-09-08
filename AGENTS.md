@@ -2,8 +2,8 @@
 
 ## Repo layout
 
-- This parent repo is currently **spec-only and holds no code**. All specifications live in `.private/`, which is a **separate git repo** — commit spec changes there, never here.
-- Implementation code will live at this repo root when implementation begins.
+- This repository root contains the PWCE modular-monolith implementation, public Agent Gateway contracts, tests, development evidence, and user documentation.
+- Normative product specifications live in `.private/`, which is a **separate git repo**. Commit implementation changes here and specification changes there; never combine their histories.
 
 ## User documentation requirement
 
@@ -11,11 +11,11 @@ This project maintains user documentation in `docs/user-docs/` at this repo root
 
 The release note tells the human tester exactly what to test after your change: it links every QA script the change touched. Docs without it leave testers guessing.
 
-### Current status: pre-implementation
+### Current status: implementation in progress
 
-`docs/user-docs/` does not exist yet because no code or user flows exist. Do **not** create ad-hoc user docs. When implementation produces the first runnable user flow, run the bootstrap (`.private/standards/docs-bootstrap-prompt.md`) at this repo root, seeding Phases 1–2 from the spec-derived draft map at `.private/standards/feature-map-draft.md` and `.private/PWCE_PRODUCT_JOURNEYS.md`.
+`docs/user-docs/` exists and is the current documentation set. Follow its feature map and the workflow below for every user-visible change. Do not replace it with ad-hoc documentation.
 
-### Workflow (in force once `docs/user-docs/` exists)
+### Workflow
 
 1. **Before coding**, read `docs/user-docs/feature-map.md` and find the row(s) for the feature you're touching. That row names the exact manual page and QA script to update. New feature → you'll add a row.
 2. **After implementing**, update the docs:
