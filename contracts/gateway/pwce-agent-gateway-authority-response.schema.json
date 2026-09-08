@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pwce.local/contracts/pwce-agent-gateway-authority-response-1.0.0.schema.json",
+  "title": "PWCE Agent Gateway authority response",
+  "type": "object",
+  "required": ["authorityContextRef", "expiresAt", "siteRefs"],
+  "properties": {
+    "authorityContextRef": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "expiresAt": { "type": "string", "format": "date-time" },
+    "siteRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 128 } }
+  },
+  "additionalProperties": false
+}

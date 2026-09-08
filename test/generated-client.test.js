@@ -5,7 +5,7 @@ import { PwceAgentGatewayClient } from "../src/gateway/generated-client.js";
 test("generated gateway client emits the published operation names", async () => {
   const requests = [];
   const client = new PwceAgentGatewayClient({ baseUrl: "http://pwce.local", token: "gateway-test-token", fetchImpl: async (url, options) => {
-    if (url.endsWith("/profile")) return new Response(JSON.stringify({ profileId: "pwce-agent-gateway.v1", profileVersion: "1.0.0", bundleId: "pwce-agent-gateway.bundle.v1", bundleVersion: "1.0.0", schemaStatus: "published", schemaDigest: "3af96275bc26754a8cebc64febb10b5ca50c951fd5003f106e06cfda846d4d3b", operationCatalogVersion: "0.1.0", operationCatalogDigest: "445cb4e4b9811a26a41c5821c7d68b09f377b69d24d42ec6dcd0acec5d950b65" }), { status: 200, headers: { "content-type": "application/json" } });
+    if (url.endsWith("/profile")) return new Response(JSON.stringify({ profileId: "pwce-agent-gateway.v1", profileVersion: "1.0.0", bundleId: "pwce-agent-gateway.bundle.v1", bundleVersion: "1.0.0", schemaStatus: "published", schemaDigest: "32c555ba675b61b4c1ec82245e314a8f6ca537484defbeb48b9fe1b6bdf4e2e2", operationCatalogVersion: "0.1.0", operationCatalogDigest: "445cb4e4b9811a26a41c5821c7d68b09f377b69d24d42ec6dcd0acec5d950b65" }), { status: 200, headers: { "content-type": "application/json" } });
     requests.push({ url, options, payload: JSON.parse(options.body) });
     return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
   } });
@@ -25,7 +25,7 @@ test("generated gateway client negotiates before issuing authority", async () =>
   const paths = [];
   const client = new PwceAgentGatewayClient({ baseUrl: "http://pwce.local", token: "gateway-test-token", fetchImpl: async (url) => {
     paths.push(url);
-    if (url.endsWith("/profile")) return new Response(JSON.stringify({ profileId: "pwce-agent-gateway.v1", profileVersion: "1.0.0", bundleId: "pwce-agent-gateway.bundle.v1", bundleVersion: "1.0.0", schemaStatus: "published", schemaDigest: "3af96275bc26754a8cebc64febb10b5ca50c951fd5003f106e06cfda846d4d3b", operationCatalogVersion: "0.1.0", operationCatalogDigest: "445cb4e4b9811a26a41c5821c7d68b09f377b69d24d42ec6dcd0acec5d950b65" }), { status: 200 });
+    if (url.endsWith("/profile")) return new Response(JSON.stringify({ profileId: "pwce-agent-gateway.v1", profileVersion: "1.0.0", bundleId: "pwce-agent-gateway.bundle.v1", bundleVersion: "1.0.0", schemaStatus: "published", schemaDigest: "32c555ba675b61b4c1ec82245e314a8f6ca537484defbeb48b9fe1b6bdf4e2e2", operationCatalogVersion: "0.1.0", operationCatalogDigest: "445cb4e4b9811a26a41c5821c7d68b09f377b69d24d42ec6dcd0acec5d950b65" }), { status: 200 });
     return new Response(JSON.stringify({ authorityContextRef: "authority.fixture" }), { status: 201 });
   } });
   await client.authority({ siteRefs: ["home.one"] });
@@ -34,7 +34,7 @@ test("generated gateway client negotiates before issuing authority", async () =>
 
 test("generated gateway client parses bounded invalidation SSE frames", async () => {
   const client = new PwceAgentGatewayClient({ baseUrl: "http://pwce.local", token: "gateway-test-token", fetchImpl: async (url) => {
-    if (url.endsWith("/profile")) return new Response(JSON.stringify({ profileId: "pwce-agent-gateway.v1", profileVersion: "1.0.0", bundleId: "pwce-agent-gateway.bundle.v1", bundleVersion: "1.0.0", schemaStatus: "published", schemaDigest: "3af96275bc26754a8cebc64febb10b5ca50c951fd5003f106e06cfda846d4d3b", operationCatalogVersion: "0.1.0", operationCatalogDigest: "445cb4e4b9811a26a41c5821c7d68b09f377b69d24d42ec6dcd0acec5d950b65" }), { status: 200 });
+    if (url.endsWith("/profile")) return new Response(JSON.stringify({ profileId: "pwce-agent-gateway.v1", profileVersion: "1.0.0", bundleId: "pwce-agent-gateway.bundle.v1", bundleVersion: "1.0.0", schemaStatus: "published", schemaDigest: "32c555ba675b61b4c1ec82245e314a8f6ca537484defbeb48b9fe1b6bdf4e2e2", operationCatalogVersion: "0.1.0", operationCatalogDigest: "445cb4e4b9811a26a41c5821c7d68b09f377b69d24d42ec6dcd0acec5d950b65" }), { status: 200 });
     return new Response(": gateway-replay\nid: 7\nevent: context.invalidated\ndata: {\"eventId\":\"evt-7\"}\n\nid: 8\nevent: resync.required\ndata: {\"reason\":\"cursor_expired\"}\n\n", { status: 200, headers: { "content-type": "text/event-stream" } });
   } });
   const events = [];
