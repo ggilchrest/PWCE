@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createStudioHttpServer, listAuthorizedSites } from "../src/http/dev-server.js";
+import { createStudioHttpServer, errorPayload, listAuthorizedSites } from "../src/http/dev-server.js";
 import { StateStore, emptyState } from "../src/runtime/state-store.js";
 import { createStudioService } from "../src/studio/studio-service.js";
 
@@ -90,4 +90,9 @@ test("Studio stop reports offline and ignores late adapter status", async () => 
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.deepEqual(service.runtimeStatus(), { status: "offline", reason: "studio_stopped" });
   assert.equal((await store.load()).sources["ha.home.one"].status, "offline");
+});
+
+test("Studio HTTP errors include stable codes while preserving messages", () => {
+  assert.deepEqual(errorPayload("route_not_found", "not_found"), { error: "route_not_found", code: "not_found" });
+  assert.deepEqual(errorPayload("site is outside Studio authority", "scope_denied"), { error: "site is outside Studio authority", code: "scope_denied" });
 });

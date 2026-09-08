@@ -26,6 +26,10 @@ function json(res, status, value) {
   res.end(encoded);
 }
 
+export function errorPayload(message, code) {
+  return { error: message, code: code ?? message };
+}
+
 function requestFromPayload(payload, service) {
   return {
     ...payload,
@@ -70,8 +74,8 @@ export async function createStudioHttpServer({ env = process.env, store, service
         }
         const cookies = parseCookies(req.headers.cookie);
         const studioContext = getStudioContext({ authorization: req.headers.authorization, cookie: cookies.pwce_studio_session, configuredToken: configuredStudioToken, sessions, siteRefs: effectiveService.siteRefs });
-        if (!studioContext) return json(res, configuredStudioToken ? 401 : 503, { error: configuredStudioToken ? "studio_authentication_required" : "studio_token_not_configured" });
-        const requireSite = (siteRef) => { if (!studioContext.siteRefs.includes(siteRef)) { const error = new Error("site is outside Studio authority"); error.statusCode = 403; throw error; } };
+        if (!studioContext) return json(res, configuredStudioToken ? 401 : 503, errorPayload(configuredStudioToken ? "studio_authentication_required" : "studio_token_not_configured", configuredStudioToken ? "authentication_required" : "configuration_unavailable"));
+        const requireSite = (siteRef) => { if (!studioContext.siteRefs.includes(siteRef)) { const error = new Error("site is outside Studio authority"); error.code = "scope_denied"; error.statusCode = 403; throw error; } };
         if (req.method === "GET" && url.pathname === "/api/health") return json(res, 200, { ...(await getHealth(effectiveStore)), runtime: effectiveService.runtimeStatus() });
         if (req.method === "GET" && url.pathname === "/api/sites") {
           return json(res, 200, { sites: await listAuthorizedSites({ store: effectiveStore, siteRefs: studioContext.siteRefs }) });
@@ -83,7 +87,7 @@ export async function createStudioHttpServer({ env = process.env, store, service
         if (req.method === "GET" && url.pathname === "/api/context/explain") { const siteRef = url.searchParams.get("siteRef") ?? effectiveService.siteRef; requireSite(siteRef); return json(res, 200, await explainCurrent(effectiveStore, { siteRef, externalEntityId: url.searchParams.get("entityId") ?? effectiveService.entityId, property: url.searchParams.get("property") ?? "state" })); }
         if (req.method === "GET" && url.pathname === "/api/context/history") { const siteRef = url.searchParams.get("siteRef") ?? effectiveService.siteRef; requireSite(siteRef); const limitText = url.searchParams.get("limit"); const limit = limitText === null ? undefined : Number(limitText); const history = await queryHistory(effectiveStore, { siteRef, externalEntityId: url.searchParams.get("entityId") ?? effectiveService.entityId, property: url.searchParams.get("property") ?? "state", limit, cursor: url.searchParams.get("cursor") ?? undefined }); return json(res, 200, history); }
         if (req.method === "POST" && url.pathname === "/api/actions/preview") {
-          if (!effectiveService.actionService) return json(res, 503, { error: "home_assistant_not_configured" });
+          if (!effectiveService.actionService) return json(res, 503, errorPayload("home_assistant_not_configured", "configuration_unavailable"));
           const request = requestFromPayload(await readJsonBody(req), effectiveService); requireSite(request.siteRef); return json(res, 200, effectiveService.actionService.preview(request));
         }
         if (req.method === "POST" && url.pathname === "/api/approvals") {
@@ -92,9 +96,9 @@ export async function createStudioHttpServer({ env = process.env, store, service
           return json(res, 201, await effectiveService.approvalService.request({ request, requestedBy: "principal.studio" }));
         }
         const approvalMatch = url.pathname.match(/^\/api\/approvals\/([^/]+)\/approve$/);
-        if (req.method === "POST" && approvalMatch) { const state = await effectiveStore.load(); const approval = state.approvals[approvalMatch[1]]; if (!approval) return json(res, 404, { error: "approval_not_found" }); if (approval.siteRef) requireSite(approval.siteRef); return json(res, 200, await effectiveService.approvalService.approve({ approvalRef: approvalMatch[1], approvedBy: "human.local" })); }
+        if (req.method === "POST" && approvalMatch) { const state = await effectiveStore.load(); const approval = state.approvals[approvalMatch[1]]; if (!approval) return json(res, 404, errorPayload("approval_not_found", "not_found")); if (approval.siteRef) requireSite(approval.siteRef); return json(res, 200, await effectiveService.approvalService.approve({ approvalRef: approvalMatch[1], approvedBy: "human.local" })); }
         if (req.method === "POST" && url.pathname === "/api/actions/dispatch") {
-          if (!effectiveService.actionService) return json(res, 503, { error: "home_assistant_not_configured" });
+          if (!effectiveService.actionService) return json(res, 503, errorPayload("home_assistant_not_configured", "configuration_unavailable"));
           const request = requestFromPayload(await readJsonBody(req), effectiveService);
           requireSite(request.siteRef);
           const admitted = await effectiveService.actionService.authorizeDispatch(request);
@@ -106,20 +110,20 @@ export async function createStudioHttpServer({ env = process.env, store, service
         if (req.method === "GET" && actionMatch) {
           const state = await effectiveStore.load();
           const action = state.actions[actionMatch[1]]; if (action) requireSite(action.siteRef);
-          return action ? json(res, 200, action) : json(res, 404, { error: "action_not_found" });
+          return action ? json(res, 200, action) : json(res, 404, errorPayload("action_not_found", "not_found"));
         }
         const evidenceMatch = url.pathname.match(/^\/api\/evidence\/([^/]+)$/);
-        if (req.method === "GET" && evidenceMatch) { const state = await effectiveStore.load(); const evidence = state.observations.find((candidate) => candidate.recordId === evidenceMatch[1]); if (!evidence) return json(res, 404, { error: "evidence_not_found" }); requireSite(evidence.payload.siteRef); return json(res, 200, { status: "known", evidence }); }
-        return json(res, 404, { error: "route_not_found" });
+        if (req.method === "GET" && evidenceMatch) { const state = await effectiveStore.load(); const evidence = state.observations.find((candidate) => candidate.recordId === evidenceMatch[1]); if (!evidence) return json(res, 404, errorPayload("evidence_not_found", "not_found")); requireSite(evidence.payload.siteRef); return json(res, 200, { status: "known", evidence }); }
+        return json(res, 404, errorPayload("route_not_found", "not_found"));
       }
       const requested = url.pathname === "/" ? "/index.html" : url.pathname;
       const file = resolve(studioRoot, `.${requested}`);
-      if (!file.startsWith(`${studioRoot}/`)) return json(res, 404, { error: "not_found" });
+      if (!file.startsWith(`${studioRoot}/`)) return json(res, 404, errorPayload("not_found", "not_found"));
       const content = await readFile(file);
       res.writeHead(200, { "content-type": contentTypes[extname(file)] ?? "application/octet-stream", "cache-control": "no-store" });
       res.end(content);
     } catch (error) {
-      json(res, error.statusCode ?? (/not found/i.test(error.message) ? 404 : 400), { error: error.message });
+      json(res, error.statusCode ?? (/not found/i.test(error.message) ? 404 : 400), errorPayload(error.message, error.code ?? "request_failed"));
     }
   });
   server.on("close", () => effectiveService.stop?.());
