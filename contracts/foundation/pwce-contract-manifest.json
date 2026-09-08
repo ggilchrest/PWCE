@@ -1,0 +1,29 @@
+{
+  "artifactIdentifier": "PWCE-CONTRACT-MANIFEST-V1-001",
+  "version": "0.1.0",
+  "status": "Draft",
+  "profile": "PWCE-PROFILE-V1-001@0.1.0",
+  "digestAlgorithm": "sha256-bytes-v1",
+  "generatedOn": "2026-08-18",
+  "authority": "Non-normative until the V1 profile and these exact digests are approved.",
+  "files": [
+    {
+      "artifactIdentifier": "PWCE-SCHEMA-TYPES-V1-001",
+      "path": "pwce-shared-types.schema.json",
+      "version": "0.1.0",
+      "sha256": "16805313822d09322a7386b9a7a8f126cef8691f7a774cba28ea6cf9de158f8d"
+    },
+    {
+      "artifactIdentifier": "PWCE-SCHEMA-ENVELOPE-V1-001",
+      "path": "pwce-envelope.schema.json",
+      "version": "0.1.0",
+      "sha256": "b2aa75fb0d212861d6b6182750bd387cbe917a7ae5b2b65f31540906a18e3a11"
+    },
+    {
+      "artifactIdentifier": "PWCE-FIXTURE-SHARED-V1-001",
+      "path": "pwce-shared-contract-vectors.json",
+      "version": "0.1.0",
+      "sha256": "5a857e42a6d2c47c28c04b8c2abad20ae1c36a578646de3f9c0ee1eacc706103"
+    }
+  ]
+}

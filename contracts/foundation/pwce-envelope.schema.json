@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pwce.local/contracts/pwce-envelope.schema.json",
+  "x-pwce-artifactIdentifier": "PWCE-SCHEMA-ENVELOPE-V1-001",
+  "x-pwce-version": "0.1.0",
+  "x-pwce-status": "Draft",
+  "title": "PWCE V1 governed record envelope",
+  "description": "Canonical serialized envelope for public and Plugin boundaries under proposed profile PWCE-PROFILE-V1-001.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "recordId",
+    "recordKind",
+    "schemaId",
+    "schemaVersion",
+    "producerId",
+    "recordedAt",
+    "environment",
+    "correlationId",
+    "provenance",
+    "dataClassification",
+    "retentionPolicyRef",
+    "integrity",
+    "payload"
+  ],
+  "properties": {
+    "recordId": {
+      "$ref": "pwce-shared-types.schema.json#/$defs/opaqueId"
+    },
+    "recordKind": {
+      "$ref": "pwce-shared-types.schema.json#/$defs/recordKind"
+    },
+    "worldId": {
+      "$ref": "pwce-shared-types.schema.json#/$defs/opaqueId"
+    },
+    "platformScope": {
+      "const": "platform"
+    },
+    "schemaId": {
+      "$ref": "pwce-shared-types.schema.json#/$defs/namespacedId"
+    },
+    "schemaVersion": {
+      "$ref": "pwce-shared-types.schema.json#/$defs/semver"
+    },
+    "producerId": {
+      "$ref": "pwce-shared-types.schema.json#/$defs/opaqueId"
+    },
+    "sourceId": {
+      "$ref": "pwce-shared-types.schema.json#/$defs/opaqueId"
+    },
+    "recordedAt": {
+      "$ref": "pwce-shared-types.schema.json#/$defs/utcTimestamp"
+    },
+    "ingestedAt": {
+      "$ref": "pwce-shared-types.schema.json#/$defs/utcTimestamp"
+    },
+    "eventTime": {
+      "$ref": "pwce-shared-types.schema.json#/$defs/utcTimestamp"
+    },
+    "validity": {
+      "$ref": "pwce-shared-types.schema.json#/$defs/validity"
+    },
+    "environment": {
+      "$ref": "pwce-shared-types.schema.json#/$defs/environment"
+    },
+    "correlationId": {
+      "$ref": "pwce-shared-types.schema.json#/$defs/opaqueId"
+    },
+    "causationRefs": {
+      "type": "array",
+      "items": {"$ref": "pwce-shared-types.schema.json#/$defs/opaqueId"},
+      "uniqueItems": true
+    },
+    "subjectRefs": {
+      "type": "array",
+      "items": {"$ref": "pwce-shared-types.schema.json#/$defs/opaqueId"},
+      "uniqueItems": true
+    },
+    "provenance": {
+      "$ref": "pwce-shared-types.schema.json#/$defs/provenance"
+    },
+    "dataClassification": {
+      "$ref": "pwce-shared-types.schema.json#/$defs/dataClassification"
+    },
+    "retentionPolicyRef": {
+      "$ref": "pwce-shared-types.schema.json#/$defs/namespacedId"
+    },
+    "integrity": {
+      "$ref": "pwce-shared-types.schema.json#/$defs/integrity"
+    },
+    "payload": {}
+  },
+  "oneOf": [
+    {
+      "required": ["worldId"],
+      "not": {"required": ["platformScope"]}
+    },
+    {
+      "required": ["platformScope"],
+      "not": {"required": ["worldId"]}
+    }
+  ]
+}

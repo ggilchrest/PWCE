@@ -1,0 +1,608 @@
+{
+  "artifactIdentifier": "PWCE-FIXTURE-SHARED-V1-001",
+  "status": "Draft",
+  "fixtureSetId": "pwce.shared.contract.vectors",
+  "fixtureSetVersion": "0.1.0",
+  "profile": "PWCE-PROFILE-V1-001@0.1.0",
+  "schema": "../contracts/pwce-envelope.schema.json",
+  "validationScope": "canonical-envelope-and-declared-shared-type-checks",
+  "description": "Initial envelope-valid and envelope-invalid vectors for the PWCE V1 canonical envelope. Payload fields are illustrative and require separate owner schemas and semantic fixtures before the corresponding product capability can claim contract conformance. Producer content-integrity values must be recomputed by the conformance runner.",
+  "vectors": [
+    {
+      "id": "valid-world-observation",
+      "expectedEnvelopeValid": true,
+      "expectedIntegrityValid": true,
+      "semanticPurpose": "A Source-reported presence signal Observation in normal Live processing.",
+      "record": {
+        "recordId": "018f0000-0000-7000-8000-000000000001",
+        "recordKind": "observation",
+        "worldId": "018f0000-0000-7000-8000-000000000100",
+        "schemaId": "pwce.observation.presence-signal",
+        "schemaVersion": "1.0.0",
+        "producerId": "018f0000-0000-7000-8000-000000000200",
+        "sourceId": "018f0000-0000-7000-8000-000000000201",
+        "recordedAt": "2026-08-18T15:00:00.125Z",
+        "ingestedAt": "2026-08-18T15:00:00.100Z",
+        "eventTime": "2026-08-18T15:00:00.000Z",
+        "environment": {
+          "environmentId": "018f0000-0000-7000-8000-000000000300",
+          "environmentClass": "live",
+          "executionMode": "normal"
+        },
+        "correlationId": "018f0000-0000-7000-8000-000000000400",
+        "subjectRefs": ["018f0000-0000-7000-8000-000000000500"],
+        "provenance": {
+          "producerId": "018f0000-0000-7000-8000-000000000200",
+          "processId": "pwce.observation.normalizer",
+          "processVersion": "1.0.0",
+          "inputRefs": [],
+          "authorityRefs": ["018f0000-0000-7000-8000-000000000600"],
+          "transformationRefs": ["pwce.transform.presence-signal.v1"]
+        },
+        "dataClassification": "private",
+        "retentionPolicyRef": "pwce.retention.default.v1",
+        "integrity": {
+          "schemeId": "sha256-jcs-v1",
+          "schemeVersion": "1.0.0",
+          "covers": "envelope_without_integrity_value",
+          "value": "16085241aca5648e10dfa5c65240f63968f24e8bfc1853bb5d9670d9292ad012"
+        },
+        "payload": {
+          "phenomenon": "presence_signal",
+          "detected": true,
+          "spaceRef": "018f0000-0000-7000-8000-000000000501",
+          "signalStrengthDbm": -58,
+          "sourceQuality": "nominal"
+        }
+      }
+    },
+    {
+      "id": "valid-derived-assertion",
+      "expectedEnvelopeValid": true,
+      "expectedIntegrityValid": true,
+      "relatedVectorIds": ["valid-world-observation"],
+      "semanticPurpose": "A Derived assertion linked to direct Observation Evidence without claiming Projection selection.",
+      "record": {
+        "recordId": "018f0000-0000-7000-8000-000000000002",
+        "recordKind": "assertion",
+        "worldId": "018f0000-0000-7000-8000-000000000100",
+        "schemaId": "pwce.assertion.presence",
+        "schemaVersion": "1.0.0",
+        "producerId": "018f0000-0000-7000-8000-000000000202",
+        "recordedAt": "2026-08-18T15:00:00.250Z",
+        "validity": {
+          "start": "2026-08-18T15:00:00.000Z",
+          "end": "2026-08-18T15:00:10.000Z",
+          "startInclusive": true,
+          "endInclusive": false,
+          "uncertaintyMs": 100
+        },
+        "environment": {
+          "environmentId": "018f0000-0000-7000-8000-000000000300",
+          "environmentClass": "live",
+          "executionMode": "normal"
+        },
+        "correlationId": "018f0000-0000-7000-8000-000000000400",
+        "causationRefs": ["018f0000-0000-7000-8000-000000000001"],
+        "subjectRefs": ["018f0000-0000-7000-8000-000000000500", "018f0000-0000-7000-8000-000000000501"],
+        "provenance": {
+          "producerId": "018f0000-0000-7000-8000-000000000202",
+          "processId": "pwce.fusion.presence-rule",
+          "processVersion": "1.0.0",
+          "inputRefs": ["018f0000-0000-7000-8000-000000000001"],
+          "authorityRefs": ["018f0000-0000-7000-8000-000000000600"],
+          "transformationRefs": ["pwce.fusion.presence.v1"]
+        },
+        "dataClassification": "private",
+        "retentionPolicyRef": "pwce.retention.default.v1",
+        "integrity": {
+          "schemeId": "sha256-jcs-v1",
+          "schemeVersion": "1.0.0",
+          "covers": "envelope_without_integrity_value",
+          "value": "3854503df2a871c5e233c88ac0ecc72d8a9bbd2320bcc9663ccae112ed6e6a62"
+        },
+        "payload": {
+          "assertionKind": "derived",
+          "predicate": "is_present_in",
+          "subjectRef": "018f0000-0000-7000-8000-000000000500",
+          "valueRef": "018f0000-0000-7000-8000-000000000501",
+          "confidence": {"value": 0.95, "method": "pwce.confidence.presence.v1"}
+        }
+      }
+    },
+    {
+      "id": "valid-policy-decision",
+      "expectedEnvelopeValid": true,
+      "expectedIntegrityValid": true,
+      "semanticPurpose": "A deterministic allow Decision that is not itself a Command.",
+      "record": {
+        "recordId": "018f0000-0000-7000-8000-000000000003",
+        "recordKind": "decision",
+        "worldId": "018f0000-0000-7000-8000-000000000100",
+        "schemaId": "pwce.decision.authorization",
+        "schemaVersion": "1.0.0",
+        "producerId": "018f0000-0000-7000-8000-000000000203",
+        "recordedAt": "2026-08-18T15:01:00.000Z",
+        "environment": {
+          "environmentId": "018f0000-0000-7000-8000-000000000300",
+          "environmentClass": "live",
+          "executionMode": "normal"
+        },
+        "correlationId": "018f0000-0000-7000-8000-000000000401",
+        "subjectRefs": ["018f0000-0000-7000-8000-000000000501"],
+        "provenance": {
+          "producerId": "018f0000-0000-7000-8000-000000000203",
+          "processId": "pwce.policy.evaluator",
+          "processVersion": "1.0.0",
+          "inputRefs": [],
+          "authorityRefs": ["018f0000-0000-7000-8000-000000000601"],
+          "transformationRefs": ["pwce.policy.local-control.v1"]
+        },
+        "dataClassification": "sensitive",
+        "retentionPolicyRef": "pwce.retention.default.v1",
+        "integrity": {
+          "schemeId": "sha256-jcs-v1",
+          "schemeVersion": "1.0.0",
+          "covers": "envelope_without_integrity_value",
+          "value": "f4be0c0e0c4ac20c65b5a4910b039b81dc295c55780cc77c0381b1ddfc08e7a4"
+        },
+        "payload": {
+          "outcome": "allowed",
+          "rationaleCodes": ["owner_grant_active"],
+          "authorizedOperation": "set_level",
+          "validUntil": "2026-08-18T15:02:00.000Z"
+        }
+      }
+    },
+    {
+      "id": "valid-effectful-command",
+      "expectedEnvelopeValid": true,
+      "expectedIntegrityValid": true,
+      "relatedVectorIds": ["valid-policy-decision"],
+      "semanticPurpose": "An effectful Command caused by and authorized through a separate Decision.",
+      "record": {
+        "recordId": "018f0000-0000-7000-8000-000000000004",
+        "recordKind": "command",
+        "worldId": "018f0000-0000-7000-8000-000000000100",
+        "schemaId": "pwce.command.resource.set-level",
+        "schemaVersion": "1.0.0",
+        "producerId": "018f0000-0000-7000-8000-000000000204",
+        "recordedAt": "2026-08-18T15:01:00.050Z",
+        "environment": {
+          "environmentId": "018f0000-0000-7000-8000-000000000300",
+          "environmentClass": "live",
+          "executionMode": "normal"
+        },
+        "correlationId": "018f0000-0000-7000-8000-000000000401",
+        "causationRefs": ["018f0000-0000-7000-8000-000000000003"],
+        "subjectRefs": ["018f0000-0000-7000-8000-000000000501"],
+        "provenance": {
+          "producerId": "018f0000-0000-7000-8000-000000000204",
+          "processId": "pwce.resource.command-owner",
+          "processVersion": "1.0.0",
+          "inputRefs": ["018f0000-0000-7000-8000-000000000003"],
+          "authorityRefs": ["018f0000-0000-7000-8000-000000000003"]
+        },
+        "dataClassification": "sensitive",
+        "retentionPolicyRef": "pwce.retention.default.v1",
+        "integrity": {
+          "schemeId": "sha256-jcs-v1",
+          "schemeVersion": "1.0.0",
+          "covers": "envelope_without_integrity_value",
+          "value": "ff550415bc135fb024a15ec46fec3c4f23ed4f645b9536c3c102576c43990e73"
+        },
+        "payload": {
+          "operation": "set_level",
+          "parameters": {"level": 0.4},
+          "idempotencyId": "018f0000-0000-7000-8000-000000000700",
+          "decisionRef": "018f0000-0000-7000-8000-000000000003",
+          "status": "requested"
+        }
+      }
+    },
+    {
+      "id": "valid-replay-result",
+      "expectedEnvelopeValid": true,
+      "expectedIntegrityValid": true,
+      "relatedVectorIds": ["valid-effectful-command"],
+      "semanticPurpose": "A new Result in replay execution mode that records Live-route denial.",
+      "record": {
+        "recordId": "018f0000-0000-7000-8000-000000000005",
+        "recordKind": "result",
+        "worldId": "018f0000-0000-7000-8000-000000000100",
+        "schemaId": "pwce.result.replay-route",
+        "schemaVersion": "1.0.0",
+        "producerId": "018f0000-0000-7000-8000-000000000205",
+        "recordedAt": "2026-08-18T15:05:00.000Z",
+        "environment": {
+          "environmentId": "018f0000-0000-7000-8000-000000000301",
+          "environmentClass": "live",
+          "executionMode": "replay"
+        },
+        "correlationId": "018f0000-0000-7000-8000-000000000402",
+        "causationRefs": ["018f0000-0000-7000-8000-000000000004"],
+        "subjectRefs": ["018f0000-0000-7000-8000-000000000501"],
+        "provenance": {
+          "producerId": "018f0000-0000-7000-8000-000000000205",
+          "processId": "pwce.replay.route-guard",
+          "processVersion": "1.0.0",
+          "inputRefs": ["018f0000-0000-7000-8000-000000000004"],
+          "authorityRefs": ["018f0000-0000-7000-8000-000000000602"],
+          "limitations": ["No Live effect route was eligible."]
+        },
+        "dataClassification": "sensitive",
+        "retentionPolicyRef": "pwce.retention.default.v1",
+        "integrity": {
+          "schemeId": "sha256-jcs-v1",
+          "schemeVersion": "1.0.0",
+          "covers": "envelope_without_integrity_value",
+          "value": "53b3d11ea9914944f6fd5126d2fcf321b173278b8335a979cfc6bb10104c72ad"
+        },
+        "payload": {
+          "status": "rejected",
+          "reasonCode": "live_route_denied_in_replay",
+          "externalEffectOccurred": false
+        }
+      }
+    },
+    {
+      "id": "valid-platform-health",
+      "expectedEnvelopeValid": true,
+      "expectedIntegrityValid": true,
+      "semanticPurpose": "A Platform-scoped operational health record without a World scope.",
+      "record": {
+        "recordId": "018f0000-0000-7000-8000-000000000006",
+        "recordKind": "health",
+        "platformScope": "platform",
+        "schemaId": "pwce.health.schema-registry",
+        "schemaVersion": "1.0.0",
+        "producerId": "018f0000-0000-7000-8000-000000000206",
+        "recordedAt": "2026-08-18T15:10:00.000Z",
+        "environment": {
+          "environmentId": "018f0000-0000-7000-8000-000000000300",
+          "environmentClass": "live",
+          "executionMode": "normal"
+        },
+        "correlationId": "018f0000-0000-7000-8000-000000000403",
+        "provenance": {
+          "producerId": "018f0000-0000-7000-8000-000000000206",
+          "processId": "pwce.eventing.health",
+          "processVersion": "1.0.0",
+          "inputRefs": [],
+          "authorityRefs": []
+        },
+        "dataClassification": "internal",
+        "retentionPolicyRef": "pwce.retention.default.v1",
+        "integrity": {
+          "schemeId": "sha256-jcs-v1",
+          "schemeVersion": "1.0.0",
+          "covers": "envelope_without_integrity_value",
+          "value": "3a713aa58f698e8e2b3cbdcf1ab996bfab5490f29e1fbe6add4a7c8ea17c5f60"
+        },
+        "payload": {
+          "status": "healthy",
+          "evaluatedAt": "2026-08-18T15:10:00.000Z",
+          "reasonCodes": []
+        }
+      }
+    },
+    {
+      "id": "envelope-valid-tampered-content-digest",
+      "expectedEnvelopeValid": true,
+      "expectedIntegrityValid": false,
+      "relatedVectorIds": ["valid-platform-health"],
+      "semanticPurpose": "An envelope-valid record whose producer content digest was deliberately altered.",
+      "record": {
+        "recordId": "018f0000-0000-7000-8000-000000000007",
+        "recordKind": "health",
+        "platformScope": "platform",
+        "schemaId": "pwce.health.schema-registry",
+        "schemaVersion": "1.0.0",
+        "producerId": "018f0000-0000-7000-8000-000000000206",
+        "recordedAt": "2026-08-18T15:10:01.000Z",
+        "environment": {
+          "environmentId": "018f0000-0000-7000-8000-000000000300",
+          "environmentClass": "live",
+          "executionMode": "normal"
+        },
+        "correlationId": "018f0000-0000-7000-8000-000000000403",
+        "provenance": {
+          "producerId": "018f0000-0000-7000-8000-000000000206",
+          "processId": "pwce.eventing.health",
+          "processVersion": "1.0.0",
+          "inputRefs": [],
+          "authorityRefs": []
+        },
+        "dataClassification": "internal",
+        "retentionPolicyRef": "pwce.retention.default.v1",
+        "integrity": {
+          "schemeId": "sha256-jcs-v1",
+          "schemeVersion": "1.0.0",
+          "covers": "envelope_without_integrity_value",
+          "value": "0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        "payload": {
+          "status": "healthy",
+          "evaluatedAt": "2026-08-18T15:10:01.000Z",
+          "reasonCodes": []
+        }
+      }
+    },
+    {
+      "id": "invalid-both-world-and-platform-scope",
+      "expectedEnvelopeValid": false,
+      "expectedIntegrityValid": true,
+      "expectedSchemaErrors": [{"keyword": "oneOf", "instancePath": ""}],
+      "semanticPurpose": "World and Platform scope are mutually exclusive.",
+      "record": {
+        "recordId": "018f0000-0000-7000-8000-000000000010",
+        "recordKind": "event",
+        "worldId": "018f0000-0000-7000-8000-000000000100",
+        "platformScope": "platform",
+        "schemaId": "pwce.event.test",
+        "schemaVersion": "1.0.0",
+        "producerId": "018f0000-0000-7000-8000-000000000200",
+        "recordedAt": "2026-08-18T16:00:00.000Z",
+        "environment": {
+          "environmentId": "018f0000-0000-7000-8000-000000000300",
+          "environmentClass": "live",
+          "executionMode": "normal"
+        },
+        "correlationId": "018f0000-0000-7000-8000-000000000410",
+        "provenance": {
+          "producerId": "018f0000-0000-7000-8000-000000000200",
+          "processId": "pwce.fixture.invalid",
+          "processVersion": "1.0.0",
+          "inputRefs": [],
+          "authorityRefs": []
+        },
+        "dataClassification": "internal",
+        "retentionPolicyRef": "pwce.retention.default.v1",
+        "integrity": {
+          "schemeId": "sha256-jcs-v1",
+          "schemeVersion": "1.0.0",
+          "covers": "envelope_without_integrity_value",
+          "value": "21be01a61736717d2833d7f75201b03de88ecb0b17a91414b08e53650692a24b"
+        },
+        "payload": {}
+      }
+    },
+    {
+      "id": "invalid-unknown-record-kind",
+      "expectedEnvelopeValid": false,
+      "expectedIntegrityValid": true,
+      "expectedSchemaErrors": [{"keyword": "enum", "instancePath": "/recordKind"}],
+      "semanticPurpose": "A domain subtype cannot invent a top-level recordKind.",
+      "record": {
+        "recordId": "018f0000-0000-7000-8000-000000000011",
+        "recordKind": "sensor_fact",
+        "worldId": "018f0000-0000-7000-8000-000000000100",
+        "schemaId": "pwce.fixture.invalid-kind",
+        "schemaVersion": "1.0.0",
+        "producerId": "018f0000-0000-7000-8000-000000000200",
+        "recordedAt": "2026-08-18T16:00:01.000Z",
+        "environment": {
+          "environmentId": "018f0000-0000-7000-8000-000000000300",
+          "environmentClass": "live",
+          "executionMode": "normal"
+        },
+        "correlationId": "018f0000-0000-7000-8000-000000000411",
+        "provenance": {
+          "producerId": "018f0000-0000-7000-8000-000000000200",
+          "processId": "pwce.fixture.invalid",
+          "processVersion": "1.0.0",
+          "inputRefs": [],
+          "authorityRefs": []
+        },
+        "dataClassification": "private",
+        "retentionPolicyRef": "pwce.retention.default.v1",
+        "integrity": {
+          "schemeId": "sha256-jcs-v1",
+          "schemeVersion": "1.0.0",
+          "covers": "envelope_without_integrity_value",
+          "value": "cacef439e79d1aee4fdc4785b8799ce7fc5b0ddbd616ac4d8e53cd5561a3c7f8"
+        },
+        "payload": {}
+      }
+    },
+    {
+      "id": "invalid-missing-retention-policy",
+      "expectedEnvelopeValid": false,
+      "expectedIntegrityValid": true,
+      "expectedSchemaErrors": [{"keyword": "required", "instancePath": "", "missingProperty": "retentionPolicyRef"}],
+      "semanticPurpose": "A Governed record cannot omit its retention-policy reference.",
+      "record": {
+        "recordId": "018f0000-0000-7000-8000-000000000012",
+        "recordKind": "audit",
+        "platformScope": "platform",
+        "schemaId": "pwce.audit.bootstrap",
+        "schemaVersion": "1.0.0",
+        "producerId": "018f0000-0000-7000-8000-000000000200",
+        "recordedAt": "2026-08-18T16:00:02.000Z",
+        "environment": {
+          "environmentId": "018f0000-0000-7000-8000-000000000300",
+          "environmentClass": "live",
+          "executionMode": "normal"
+        },
+        "correlationId": "018f0000-0000-7000-8000-000000000412",
+        "provenance": {
+          "producerId": "018f0000-0000-7000-8000-000000000200",
+          "processId": "pwce.fixture.invalid",
+          "processVersion": "1.0.0",
+          "inputRefs": [],
+          "authorityRefs": []
+        },
+        "dataClassification": "restricted",
+        "integrity": {
+          "schemeId": "sha256-jcs-v1",
+          "schemeVersion": "1.0.0",
+          "covers": "envelope_without_integrity_value",
+          "value": "87cca892dd4e52ebdf9d1129799324a91aa02f4dcc8a4bee9840e08796391f0c"
+        },
+        "payload": {"outcome": "denied"}
+      }
+    },
+    {
+      "id": "invalid-environment-missing-execution-mode",
+      "expectedEnvelopeValid": false,
+      "expectedIntegrityValid": true,
+      "expectedSchemaErrors": [{"keyword": "required", "instancePath": "/environment", "missingProperty": "executionMode"}],
+      "semanticPurpose": "A record cannot leave normal versus Replay execution implicit.",
+      "record": {
+        "recordId": "018f0000-0000-7000-8000-000000000013",
+        "recordKind": "result",
+        "worldId": "018f0000-0000-7000-8000-000000000100",
+        "schemaId": "pwce.result.fixture",
+        "schemaVersion": "1.0.0",
+        "producerId": "018f0000-0000-7000-8000-000000000200",
+        "recordedAt": "2026-08-18T16:00:03.000Z",
+        "environment": {
+          "environmentId": "018f0000-0000-7000-8000-000000000301",
+          "environmentClass": "live"
+        },
+        "correlationId": "018f0000-0000-7000-8000-000000000413",
+        "provenance": {
+          "producerId": "018f0000-0000-7000-8000-000000000200",
+          "processId": "pwce.fixture.invalid",
+          "processVersion": "1.0.0",
+          "inputRefs": [],
+          "authorityRefs": []
+        },
+        "dataClassification": "private",
+        "retentionPolicyRef": "pwce.retention.default.v1",
+        "integrity": {
+          "schemeId": "sha256-jcs-v1",
+          "schemeVersion": "1.0.0",
+          "covers": "envelope_without_integrity_value",
+          "value": "5031afd19ef13131f5411ad50d978fecbbe46ede72ab8e2039e0a13f3faa819c"
+        },
+        "payload": {"status": "unknown"}
+      }
+    },
+    {
+      "id": "invalid-non-utc-recorded-time",
+      "expectedEnvelopeValid": false,
+      "expectedIntegrityValid": true,
+      "expectedSchemaErrors": [{"keyword": "pattern", "instancePath": "/recordedAt"}],
+      "semanticPurpose": "Canonical boundary timestamps use a trailing UTC Z.",
+      "record": {
+        "recordId": "018f0000-0000-7000-8000-000000000014",
+        "recordKind": "event",
+        "worldId": "018f0000-0000-7000-8000-000000000100",
+        "schemaId": "pwce.event.fixture",
+        "schemaVersion": "1.0.0",
+        "producerId": "018f0000-0000-7000-8000-000000000200",
+        "recordedAt": "2026-08-18T17:00:04.000+01:00",
+        "environment": {
+          "environmentId": "018f0000-0000-7000-8000-000000000300",
+          "environmentClass": "live",
+          "executionMode": "normal"
+        },
+        "correlationId": "018f0000-0000-7000-8000-000000000414",
+        "provenance": {
+          "producerId": "018f0000-0000-7000-8000-000000000200",
+          "processId": "pwce.fixture.invalid",
+          "processVersion": "1.0.0",
+          "inputRefs": [],
+          "authorityRefs": []
+        },
+        "dataClassification": "private",
+        "retentionPolicyRef": "pwce.retention.default.v1",
+        "integrity": {
+          "schemeId": "sha256-jcs-v1",
+          "schemeVersion": "1.0.0",
+          "covers": "envelope_without_integrity_value",
+          "value": "c3372449db38f940d6921a5f510df7e8320b7ecd518128d516327c1e474872e5"
+        },
+        "payload": {}
+      }
+    },
+    {
+      "id": "invalid-unregistered-extra-envelope-field",
+      "expectedEnvelopeValid": false,
+      "expectedIntegrityValid": true,
+      "expectedSchemaErrors": [{"keyword": "additionalProperties", "instancePath": "", "additionalProperty": "privateExtension"}],
+      "semanticPurpose": "A producer cannot add an undeclared shared-envelope field.",
+      "record": {
+        "recordId": "018f0000-0000-7000-8000-000000000015",
+        "recordKind": "event",
+        "worldId": "018f0000-0000-7000-8000-000000000100",
+        "schemaId": "pwce.event.fixture",
+        "schemaVersion": "1.0.0",
+        "producerId": "018f0000-0000-7000-8000-000000000200",
+        "recordedAt": "2026-08-18T16:00:05.000Z",
+        "environment": {
+          "environmentId": "018f0000-0000-7000-8000-000000000300",
+          "environmentClass": "live",
+          "executionMode": "normal"
+        },
+        "correlationId": "018f0000-0000-7000-8000-000000000415",
+        "provenance": {
+          "producerId": "018f0000-0000-7000-8000-000000000200",
+          "processId": "pwce.fixture.invalid",
+          "processVersion": "1.0.0",
+          "inputRefs": [],
+          "authorityRefs": []
+        },
+        "dataClassification": "private",
+        "retentionPolicyRef": "pwce.retention.default.v1",
+        "integrity": {
+          "schemeId": "sha256-jcs-v1",
+          "schemeVersion": "1.0.0",
+          "covers": "envelope_without_integrity_value",
+          "value": "f2e30a81187bd05cb43b5a9a019b570abcf2f2611a7bbdf7213973f55737efed"
+        },
+        "privateExtension": "undeclared",
+        "payload": {}
+      }
+    }
+  ],
+  "sharedTypeChecks": [
+    {
+      "id": "validity-requires-a-bound",
+      "schemaRef": "../contracts/pwce-shared-types.schema.json#/$defs/validity",
+      "cases": [
+        {
+          "value": {"start": "2026-08-18T15:00:00.000Z", "startInclusive": true},
+          "expectedSchemaValid": true
+        },
+        {
+          "value": {"end": "2026-08-18T15:00:10.000Z", "endInclusive": false},
+          "expectedSchemaValid": true
+        },
+        {
+          "value": {"start": "2026-08-18T15:00:00.000Z"},
+          "expectedSchemaValid": false,
+          "expectedSchemaErrors": [{"keyword": "dependentRequired", "instancePath": "", "missingProperty": "startInclusive"}]
+        },
+        {
+          "value": {"end": "2026-08-18T15:00:10.000Z"},
+          "expectedSchemaValid": false,
+          "expectedSchemaErrors": [{"keyword": "dependentRequired", "instancePath": "", "missingProperty": "endInclusive"}]
+        },
+        {
+          "value": {"startInclusive": true},
+          "expectedSchemaValid": false,
+          "expectedSchemaErrors": [{"keyword": "anyOf", "instancePath": ""}]
+        }
+      ]
+    },
+    {
+      "id": "validity-bound-order",
+      "schemaRef": "../contracts/pwce-shared-types.schema.json#/$defs/validity",
+      "semanticValidatorId": "pwce.validity.interval-order@1.0.0",
+      "semanticRule": "When both bounds exist, parse them as RFC 3339 instants and require end to be greater than or equal to start.",
+      "cases": [
+        {
+          "value": {"start": "2026-08-18T15:00:00.000Z", "startInclusive": true, "end": "2026-08-18T15:00:10.000Z", "endInclusive": false},
+          "expectedSemanticValid": true
+        },
+        {
+          "value": {"start": "2026-08-18T15:00:10.000Z", "startInclusive": true, "end": "2026-08-18T15:00:00.000Z", "endInclusive": false},
+          "expectedSemanticValid": false,
+          "expectedSemanticError": {"code": "invalid_validity_interval", "field": "validity.end"}
+        }
+      ]
+    }
+  ]
+}

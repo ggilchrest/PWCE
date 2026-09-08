@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pwce.local/contracts/pwce-shared-types.schema.json",
+  "x-pwce-artifactIdentifier": "PWCE-SCHEMA-TYPES-V1-001",
+  "x-pwce-version": "0.1.0",
+  "x-pwce-status": "Draft",
+  "title": "PWCE V1 shared contract types",
+  "description": "Proposed V1 serialized types. This schema becomes implementation-authoritative only with approval of PWCE-PROFILE-V1-001.",
+  "$defs": {
+    "opaqueId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "description": "Lowercase textual UUIDv7. Consumers must treat the value as opaque."
+    },
+    "namespacedId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$"
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "utcTimestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$",
+      "description": "RFC 3339 UTC timestamp with a trailing Z."
+    },
+    "recordKind": {
+      "type": "string",
+      "enum": [
+        "event",
+        "observation",
+        "assertion",
+        "request",
+        "decision",
+        "command",
+        "feedback",
+        "result",
+        "error",
+        "correction",
+        "retraction",
+        "supersession",
+        "health",
+        "audit",
+        "configuration",
+        "subscription",
+        "checkpoint",
+        "snapshot",
+        "manifest",
+        "lease",
+        "projection"
+      ]
+    },
+    "dataClassification": {
+      "type": "string",
+      "enum": ["internal", "private", "sensitive", "restricted"]
+    },
+    "operationStatus": {
+      "type": "string",
+      "enum": [
+        "requested",
+        "accepted",
+        "rejected",
+        "deferred",
+        "running",
+        "succeeded",
+        "partially_succeeded",
+        "failed",
+        "timed_out",
+        "cancelled",
+        "superseded",
+        "unknown"
+      ]
+    },
+    "publicationDisposition": {
+      "type": "string",
+      "enum": ["committed", "duplicate", "deferred", "quarantined", "rejected", "expired"]
+    },
+    "errorCategory": {
+      "type": "string",
+      "enum": [
+        "validation",
+        "authentication",
+        "authorization",
+        "not_found",
+        "conflict",
+        "unsupported_schema",
+        "rate_limited",
+        "unavailable",
+        "timeout",
+        "dependency_failure",
+        "storage_pressure",
+        "integrity_failure",
+        "internal_failure"
+      ]
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["environmentId", "environmentClass", "executionMode"],
+      "properties": {
+        "environmentId": {"$ref": "#/$defs/opaqueId"},
+        "environmentClass": {"type": "string", "enum": ["live", "simulated"]},
+        "executionMode": {"type": "string", "enum": ["normal", "replay"]}
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "producerId",
+        "processId",
+        "processVersion",
+        "inputRefs",
+        "authorityRefs"
+      ],
+      "properties": {
+        "producerId": {"$ref": "#/$defs/opaqueId"},
+        "processId": {"$ref": "#/$defs/namespacedId"},
+        "processVersion": {"$ref": "#/$defs/semver"},
+        "inputRefs": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/opaqueId"},
+          "uniqueItems": true
+        },
+        "authorityRefs": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/opaqueId"},
+          "uniqueItems": true
+        },
+        "transformationRefs": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/namespacedId"},
+          "uniqueItems": true
+        },
+        "limitations": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemeId", "schemeVersion", "covers", "value"],
+      "properties": {
+        "schemeId": {"const": "sha256-jcs-v1"},
+        "schemeVersion": {"const": "1.0.0"},
+        "covers": {"const": "envelope_without_integrity_value"},
+        "value": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "validity": {
+      "type": "object",
+      "additionalProperties": false,
+      "anyOf": [
+        {"required": ["start"]},
+        {"required": ["end"]}
+      ],
+      "dependentRequired": {
+        "start": ["startInclusive"],
+        "end": ["endInclusive"],
+        "startInclusive": ["start"],
+        "endInclusive": ["end"]
+      },
+      "properties": {
+        "start": {"$ref": "#/$defs/utcTimestamp"},
+        "end": {"$ref": "#/$defs/utcTimestamp"},
+        "startInclusive": {"type": "boolean"},
+        "endInclusive": {"type": "boolean"},
+        "uncertaintyMs": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

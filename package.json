@@ -10,6 +10,7 @@
     "test": "node --test",
     "validate": "node src/contract-foundation/validate-fixtures.js",
     "validate:compatibility": "node scripts/validate-pwce-compatibility-lock.mjs",
+    "generate:gateway-bundle": "node scripts/generate-gateway-bundle.mjs",
     "dev": "node src/http/dev-server.js",
     "studio:generate-recovery-codes": "node scripts/generate-studio-recovery-codes.mjs"
   }

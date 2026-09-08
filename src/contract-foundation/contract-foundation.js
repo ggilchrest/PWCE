@@ -6,7 +6,7 @@ import { canonicalize } from "./canonical-json.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
-const privateRoot = resolve(root, ".private");
+const publicFoundationRoot = resolve(root, "contracts/foundation");
 
 export const profile = {
   artifactIdentifier: "PWCE-PROFILE-PERSONAL-V1-001",
@@ -16,9 +16,9 @@ export const profile = {
 };
 
 export const paths = {
-  manifest: resolve(privateRoot, "contracts/pwce-contract-manifest.json"),
-  envelopeSchema: resolve(privateRoot, "contracts/pwce-envelope.schema.json"),
-  fixtureSet: resolve(privateRoot, "fixtures/pwce-shared-contract-vectors.json")
+  manifest: resolve(publicFoundationRoot, "pwce-contract-manifest.json"),
+  envelopeSchema: resolve(publicFoundationRoot, "pwce-envelope.schema.json"),
+  fixtureSet: resolve(publicFoundationRoot, "pwce-shared-contract-vectors.json")
 };
 
 export async function loadFoundation() {
@@ -41,7 +41,7 @@ export function integrityValue(record) {
 export async function verifyManifest(manifest) {
   const results = [];
   for (const entry of manifest.files) {
-    const path = resolve(privateRoot, "contracts", entry.path);
+    const path = resolve(publicFoundationRoot, entry.path);
     const bytes = await readFile(path);
     results.push({
       path: entry.path,
