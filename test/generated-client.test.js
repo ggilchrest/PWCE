@@ -21,6 +21,11 @@ test("generated gateway client fails closed on profile incompatibility", async (
   await assert.rejects(() => client.queryContext({ authorityContextRef: "authority.fixture", mode: "current", siteRef: "home.one", externalEntityId: "sensor.temperature", property: "temperature" }), { code: "incompatible_gateway_profile" });
 });
 
+test("generated gateway client preserves typed static transport errors", async () => {
+  const client = new PwceAgentGatewayClient({ baseUrl: "http://pwce.local", token: "gateway-test-token", fetchImpl: async () => new Response(JSON.stringify({ error: { code: "authentication_failed", message: "authentication failed" } }), { status: 401 }) });
+  await assert.rejects(() => client.profile(), { code: "authentication_failed" });
+});
+
 test("generated gateway client negotiates before issuing authority", async () => {
   const paths = [];
   const client = new PwceAgentGatewayClient({ baseUrl: "http://pwce.local", token: "gateway-test-token", fetchImpl: async (url) => {

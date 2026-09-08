@@ -21,6 +21,7 @@ test("authenticated gateway HTTP binding issues authority and delegates requests
   const binding = createGatewayHttpBinding({ store: store(), token: "gateway-test-token", siteRefs: ["home.one"] });
   const denied = await invoke(binding, { pathname: "/gateway/v1/profile" });
   assert.equal(denied.status, 401);
+  assert.equal(denied.value.error.code, "authentication_failed");
   const profile = await invoke(binding, { pathname: "/gateway/v1/profile", authorization: "Bearer gateway-test-token" });
   assert.equal(profile.status, 200);
   assert.equal(profile.value.operationCatalog.some((entry) => entry.operation === "events.subscribe"), true);

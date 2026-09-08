@@ -15,6 +15,10 @@ function json(res, status, value) {
   res.end(encoded);
 }
 
+function gatewayError(code, message = code) {
+  return { error: { code, message } };
+}
+
 function bearer(req) {
   return req.headers.authorization?.startsWith("Bearer ") ? req.headers.authorization.slice("Bearer ".length) : null;
 }
@@ -56,14 +60,14 @@ export function createGatewayHttpBinding({ store, token, principalRef = "agent.f
     gateway,
     async handle(req, res, pathname) {
       if (!pathname.startsWith("/gateway/v1/")) return false;
-      if (!token) { json(res, 503, { error: "gateway_token_not_configured" }); return true; }
+      if (!token) { json(res, 503, gatewayError("gateway_token_not_configured")); return true; }
       const presentedToken = bearer(req);
       if (req.method === "GET" && pathname === "/gateway/v1/profile") {
-        if (!sameSecret(presentedToken, token)) { json(res, 401, { error: "authentication_failed" }); return true; }
+        if (!sameSecret(presentedToken, token)) { json(res, 401, gatewayError("authentication_failed", "authentication failed")); return true; }
         return json(res, 200, gatewayProfile), true;
       }
       if (req.method === "GET" && pathname === "/gateway/v1/bundle") {
-        if (!sameSecret(presentedToken, token)) { json(res, 401, { error: "authentication_failed" }); return true; }
+        if (!sameSecret(presentedToken, token)) { json(res, 401, gatewayError("authentication_failed", "authentication failed")); return true; }
         return json(res, 200, gatewayBundle), true;
       }
       if (req.method === "GET" && pathname === "/gateway/v1/events") {
@@ -83,7 +87,7 @@ export function createGatewayHttpBinding({ store, token, principalRef = "agent.f
           return true;
         }
       }
-      if (req.method !== "POST") { json(res, 405, { error: "method_not_allowed" }); return true; }
+      if (req.method !== "POST") { json(res, 405, gatewayError("method_not_allowed")); return true; }
       try {
         if (pathname === "/gateway/v1/authority") {
           if (!sameSecret(presentedToken, token)) throw new Error("authentication failed");
@@ -95,7 +99,7 @@ export function createGatewayHttpBinding({ store, token, principalRef = "agent.f
           const result = await gateway.requestAuthenticated({ token: presentedToken, ...payload });
           return json(res, 200, result), true;
         }
-        json(res, 404, { error: "gateway_route_not_found" });
+        json(res, 404, gatewayError("gateway_route_not_found"));
         return true;
       } catch (error) {
         json(res, authError(error), { error: { code: error.code ?? "gateway_request_failed", message: error.message } });
