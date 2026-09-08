@@ -40,3 +40,13 @@ export async function readJsonBody(req) {
     throw error;
   }
 }
+
+export async function readJsonObjectBody(req) {
+  const payload = await readJsonBody(req);
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    const error = new Error("request body must be a JSON object");
+    error.code = "invalid_request";
+    throw error;
+  }
+  return payload;
+}

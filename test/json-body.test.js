@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { MAX_TRANSPORT_BYTES, readJsonBody, requireJsonContentType } from "../src/http/json-body.js";
+import { MAX_TRANSPORT_BYTES, readJsonBody, readJsonObjectBody, requireJsonContentType } from "../src/http/json-body.js";
 
 function request(chunks, headers = {}) {
   return { headers, async *[Symbol.asyncIterator]() { for (const chunk of chunks) yield chunk; } };
@@ -29,4 +29,11 @@ test("shared JSON transport requires an application/json content type", () => {
 test("shared JSON body reader types request stream failures", async () => {
   const failingRequest = { headers: {}, async *[Symbol.asyncIterator]() { throw new TypeError("request stream closed"); } };
   await assert.rejects(() => readJsonBody(failingRequest), { code: "invalid_request", message: "request body was unavailable" });
+});
+
+test("shared JSON object reader rejects non-object payloads", async () => {
+  await assert.deepEqual(await readJsonObjectBody(request(["{\"ok\":true}"])), { ok: true });
+  for (const payload of ["null", "[]", "true"]) {
+    await assert.rejects(() => readJsonObjectBody(request([payload])), { code: "invalid_request", message: "request body must be a JSON object" });
+  }
 });
