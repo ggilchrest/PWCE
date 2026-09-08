@@ -16,6 +16,7 @@ export function emptyState() {
     projections: {},
     actions: {},
     approvals: {},
+    studioAuth: null,
     audit: []
   };
 }
@@ -24,7 +25,7 @@ export function migrateState(input) {
   if (!input || typeof input !== "object") throw new Error("state must be an object");
   if (input.schemaVersion === CURRENT_STATE_VERSION) return input;
   if (input.schemaVersion === undefined || input.schemaVersion === 0) {
-    return { ...emptyState(), ...input, schemaVersion: CURRENT_STATE_VERSION, sites: input.sites ?? {}, sources: input.sources ?? {}, entities: input.entities ?? {}, observations: input.observations ?? [], idempotencyKeys: input.idempotencyKeys ?? {}, projections: input.projections ?? {}, actions: input.actions ?? {}, approvals: input.approvals ?? {}, audit: input.audit ?? [] };
+    return { ...emptyState(), ...input, schemaVersion: CURRENT_STATE_VERSION, sites: input.sites ?? {}, sources: input.sources ?? {}, entities: input.entities ?? {}, observations: input.observations ?? [], idempotencyKeys: input.idempotencyKeys ?? {}, projections: input.projections ?? {}, actions: input.actions ?? {}, approvals: input.approvals ?? {}, studioAuth: input.studioAuth ?? null, audit: input.audit ?? [] };
   }
   throw new Error(`unsupported state schema version: ${input.schemaVersion}`);
 }

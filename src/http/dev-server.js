@@ -7,7 +7,7 @@ import { getHealth } from "../runtime/health.js";
 import { getCurrent, getCurrentAggregate } from "../domain/observation-service.js";
 import { queryHistory, explainCurrent } from "../domain/query-service.js";
 import { createStudioService } from "../studio/studio-service.js";
-import { createStudioSessionRegistry, getStudioContext, parseCookies } from "./studio-auth.js";
+import { createStudioAuthService, createStudioSessionRegistry, getStudioContext, parseCookies } from "./studio-auth.js";
 import { createGatewayHttpBinding } from "./gateway-server.js";
 import { MAX_TRANSPORT_BYTES, readJsonObjectBody, requireJsonContentType } from "./json-body.js";
 import { BasicAgent } from "../agent/basic-agent.js";
@@ -31,9 +31,9 @@ export function errorPayload(message, code) {
   return { error: message, code: code ?? message };
 }
 
-export function issueStudioSession({ authorization, configuredToken, sessions, siteRefs }) {
+export function issueStudioSession({ authorization, configuredToken, sessions, siteRefs, requiresHumanAuth = false }) {
   const bootstrapContext = getStudioContext({ authorization, configuredToken, sessions, siteRefs });
-  if (configuredToken && !bootstrapContext) {
+  if ((configuredToken || requiresHumanAuth) && !bootstrapContext) {
     const error = new Error("studio_authentication_required");
     error.code = "authentication_required";
     error.statusCode = 401;
@@ -66,6 +66,14 @@ export async function createStudioHttpServer({ env = process.env, store, service
   const effectiveStore = store ?? new StateStore({ path: env.PWCE_STATE_PATH ?? join(root, ".dev", "pwce", "state.json") });
   const effectiveService = service ?? await createStudioService({ store: effectiveStore, env });
   const sessions = createStudioSessionRegistry();
+  const studioAuth = createStudioAuthService({ store: effectiveStore });
+  const configuredUsername = env.PWCE_STUDIO_USERNAME;
+  const configuredPassword = env.PWCE_STUDIO_PASSWORD;
+  const configuredRecoveryCodes = env.PWCE_STUDIO_RECOVERY_CODES?.split(",").map((code) => code.trim()).filter(Boolean);
+  if (configuredUsername !== undefined || configuredPassword !== undefined || configuredRecoveryCodes !== undefined) {
+    if (configuredUsername === undefined || configuredPassword === undefined || !configuredRecoveryCodes?.length) throw new Error("Studio username, password, and recovery codes must be configured together");
+    if (!(await studioAuth.hasAccount())) await studioAuth.initialize({ username: configuredUsername, password: configuredPassword, recoveryCodes: configuredRecoveryCodes });
+  }
   const configuredStudioToken = env.PWCE_STUDIO_TOKEN ?? null;
   const gatewayPrincipalRef = env.PWCE_GATEWAY_PRINCIPAL_REF ?? "agent.fixture";
   const gatewaySiteRefs = (env.PWCE_GATEWAY_SITE_REFS ?? effectiveService.siteRefs.join(",")).split(",").filter(Boolean);
@@ -80,10 +88,27 @@ export async function createStudioHttpServer({ env = process.env, store, service
       const url = new URL(req.url, "http://127.0.0.1");
       if (await gatewayBinding.handle(req, res, url.pathname)) return;
       if (url.pathname.startsWith("/api/")) {
+        if (req.method === "POST" && url.pathname === "/api/session") {
+          requireJsonContentType(req);
+          const payload = await readJsonObjectBody(req);
+          const identity = payload.recoveryCode
+            ? await studioAuth.authenticateRecovery({ code: payload.recoveryCode })
+            : await studioAuth.authenticate({ username: payload.username, password: payload.password });
+          if (!identity) return json(res, 401, errorPayload("studio_authentication_failed", "authentication_failed"));
+          const session = sessions.issue({ principalRef: identity.principalRef, siteRefs: effectiveService.siteRefs });
+          res.writeHead(200, { ...SECURITY_HEADERS, "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "set-cookie": [`pwce_studio_session=${encodeURIComponent(session.sessionRef)}; HttpOnly; SameSite=Strict; Path=/`] });
+          return res.end(JSON.stringify({ authenticated: true, transport: identity.transport, expiresAt: session.expiresAt }));
+        }
         if (req.method === "GET" && url.pathname === "/api/session") {
-          const { session, transport } = issueStudioSession({ authorization: req.headers.authorization, configuredToken: configuredStudioToken, sessions, siteRefs: effectiveService.siteRefs });
+          const { session, transport } = issueStudioSession({ authorization: req.headers.authorization, configuredToken: configuredStudioToken, sessions, siteRefs: effectiveService.siteRefs, requiresHumanAuth: await studioAuth.hasAccount() });
           res.writeHead(200, { ...SECURITY_HEADERS, "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "set-cookie": [`pwce_studio_session=${encodeURIComponent(session.sessionRef)}; HttpOnly; SameSite=Strict; Path=/`] });
           return res.end(JSON.stringify({ authenticated: true, transport, expiresAt: session.expiresAt }));
+        }
+        if (req.method === "POST" && url.pathname === "/api/session/logout") {
+          const cookies = parseCookies(req.headers.cookie);
+          sessions.revoke(cookies.pwce_studio_session);
+          res.writeHead(200, { ...SECURITY_HEADERS, "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "set-cookie": ["pwce_studio_session=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/"] });
+          return res.end(JSON.stringify({ authenticated: false }));
         }
         const cookies = parseCookies(req.headers.cookie);
         const studioContext = getStudioContext({ authorization: req.headers.authorization, cookie: cookies.pwce_studio_session, configuredToken: configuredStudioToken, sessions, siteRefs: effectiveService.siteRefs });

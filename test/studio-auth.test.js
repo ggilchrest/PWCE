@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createStudioSessionRegistry, getStudioContext, hasStudioAuthority, parseCookies } from "../src/http/studio-auth.js";
+import { createStudioAuthService, createStudioSessionRegistry, generateRecoveryCodes, getStudioContext, hasStudioAuthority, parseCookies } from "../src/http/studio-auth.js";
+import { StateStore, emptyState } from "../src/runtime/state-store.js";
 
 test("Studio accepts the configured bearer token and rejects other tokens", () => {
   const sessions = createStudioSessionRegistry();
@@ -23,4 +24,27 @@ test("Studio contexts expire and preserve explicit site scope", () => {
   assert.equal(sessions.get(session.sessionRef), null);
   const bearer = getStudioContext({ authorization: "Bearer local-secret", configuredToken: "local-secret", sessions, siteRefs: ["home.one"] });
   assert.deepEqual(bearer.siteRefs, ["home.one"]);
+});
+
+test("Studio local auth stores password and recovery digests and consumes recovery codes once", async () => {
+  const store = new StateStore({ state: emptyState() });
+  const auth = createStudioAuthService({ store, clock: () => new Date("2026-09-08T12:00:00.000Z") });
+  const recoveryCodes = generateRecoveryCodes(2);
+  await auth.initialize({ username: "dev.user", password: "a sufficiently long test password", recoveryCodes });
+  const state = await store.load();
+  assert.equal(state.studioAuth.username, "dev.user");
+  assert.equal(state.studioAuth.passwordHash.derivedKey.includes("test password"), false);
+  assert.equal(JSON.stringify(state).includes(recoveryCodes[0]), false);
+  assert.equal((await auth.authenticate({ username: "dev.user", password: "wrong password" })), null);
+  assert.equal((await auth.authenticate({ username: "dev.user", password: "a sufficiently long test password" })).transport, "password");
+  assert.equal((await auth.authenticateRecovery({ code: recoveryCodes[0] })).transport, "recovery_code");
+  assert.equal(await auth.authenticateRecovery({ code: recoveryCodes[0] }), null);
+  assert.equal((await auth.authenticateRecovery({ code: recoveryCodes[1] })).transport, "recovery_code");
+});
+
+test("Studio local auth rejects weak passwords and duplicate recovery codes", async () => {
+  const store = new StateStore({ state: emptyState() });
+  const auth = createStudioAuthService({ store });
+  await assert.rejects(() => auth.initialize({ username: "dev", password: "too-short", recoveryCodes: ["ABCDEF0123456789"] }), { code: "invalid_request" });
+  await assert.rejects(() => auth.initialize({ username: "dev", password: "a sufficiently long test password", recoveryCodes: ["ABCDEF0123456789", "ABC-DEF01 23456789"] }), { code: "invalid_request" });
 });

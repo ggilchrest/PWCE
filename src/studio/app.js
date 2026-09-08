@@ -11,6 +11,8 @@ async function api(path, options = {}) {
   if (!response.ok) throw new Error(data.error ?? `Request failed (${response.status})`);
   return data;
 }
+function showAuth(error = "") { $("auth-panel").hidden = false; $("studio-shell").hidden = true; $("logout").hidden = true; $("auth-error").textContent = error; }
+function showStudio() { $("auth-panel").hidden = true; $("studio-shell").hidden = false; $("logout").hidden = false; }
 function setNotice(text, kind = "") { $("notice").textContent = text; $("notice").className = `notice ${kind}`; }
 function formatDate(value) { return value ? new Date(value).toLocaleString() : "—"; }
 function escapeHtml(value) { return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;"); }
@@ -60,5 +62,7 @@ async function loadSites() {
   $("site-detail").textContent = `${selectedSiteRef} · Site-qualified context`;
 }
 $("site-select").addEventListener("change", async (event) => { selectedSiteRef = event.target.value; latestRequest = null; latestApproval = null; $("preview").disabled = isAggregate(); $("explain").disabled = isAggregate(); $("request-approval").disabled = true; $("approve").disabled = true; $("dispatch").disabled = true; await refresh(); });
-async function bootstrap() { try { await api("/api/session"); await loadSites(); await refresh(); } catch (error) { setNotice(`Unable to authenticate Studio: ${error.message}`, "error"); } }
+async function bootstrap() { try { await api("/api/session"); showStudio(); await loadSites(); await refresh(); } catch (error) { setNotice(`Sign in required: ${error.message}`, "error"); showAuth(); } }
+$("auth-form").addEventListener("submit", async (event) => { event.preventDefault(); const recoveryCode = $("auth-recovery").value.trim(); const payload = recoveryCode ? { recoveryCode } : { username: $("auth-username").value.trim(), password: $("auth-password").value }; try { await api("/api/session", { method: "POST", body: JSON.stringify(payload) }); showStudio(); await loadSites(); await refresh(); } catch (error) { showAuth(error.message); } });
+$("logout").addEventListener("click", async () => { await api("/api/session/logout", { method: "POST" }); showAuth(); setNotice("Signed out of Studio"); });
 bootstrap();
