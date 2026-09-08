@@ -21,10 +21,17 @@ export async function readJsonBody(req) {
   if (Number.isFinite(declaredLength) && declaredLength > MAX_TRANSPORT_BYTES) throw limitError("request body exceeds the 1 MiB transport limit");
   let text = "";
   let byteLength = 0;
-  for await (const chunk of req) {
-    byteLength += Buffer.byteLength(chunk);
-    if (byteLength > MAX_TRANSPORT_BYTES) throw limitError("request body exceeds the 1 MiB transport limit");
-    text += chunk;
+  try {
+    for await (const chunk of req) {
+      byteLength += Buffer.byteLength(chunk);
+      if (byteLength > MAX_TRANSPORT_BYTES) throw limitError("request body exceeds the 1 MiB transport limit");
+      text += chunk;
+    }
+  } catch (cause) {
+    if (cause?.code === "limit_exceeded") throw cause;
+    const error = new Error("request body was unavailable", { cause });
+    error.code = "invalid_request";
+    throw error;
   }
   if (!text) return {};
   try { return JSON.parse(text); } catch {

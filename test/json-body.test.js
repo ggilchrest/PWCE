@@ -25,3 +25,8 @@ test("shared JSON transport requires an application/json content type", () => {
   assert.throws(() => requireJsonContentType(request([], { "content-type": "text/plain" })), { code: "invalid_request" });
   assert.throws(() => requireJsonContentType(request([])), { code: "invalid_request" });
 });
+
+test("shared JSON body reader types request stream failures", async () => {
+  const failingRequest = { headers: {}, async *[Symbol.asyncIterator]() { throw new TypeError("request stream closed"); } };
+  await assert.rejects(() => readJsonBody(failingRequest), { code: "invalid_request", message: "request body was unavailable" });
+});
