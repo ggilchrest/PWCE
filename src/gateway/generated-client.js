@@ -27,7 +27,15 @@ export class PwceAgentGatewayClient {
       error.code = "limit_exceeded";
       throw error;
     }
-    const response = await this.#fetch(`${this.#baseUrl}${path}`, { method, signal, headers: { Authorization: `Bearer ${this.#token}`, "Content-Type": "application/json" }, ...(encodedBody === undefined ? {} : { body: encodedBody }) });
+    let response;
+    try {
+      response = await this.#fetch(`${this.#baseUrl}${path}`, { method, signal, headers: { Authorization: `Bearer ${this.#token}`, "Content-Type": "application/json" }, ...(encodedBody === undefined ? {} : { body: encodedBody }) });
+    } catch (cause) {
+      if (cause?.name === "AbortError") throw cause;
+      const error = new Error("gateway request unavailable", { cause });
+      error.code = "gateway_request_failed";
+      throw error;
+    }
     const responseBytes = await response.arrayBuffer();
     if (responseBytes.byteLength > MAX_TRANSPORT_BYTES) {
       const error = new Error("response body exceeds the 1 MiB transport limit");
@@ -114,7 +122,15 @@ export class PwceAgentGatewayClient {
 
   async *subscribeInvalidations({ authorityContextRef, siteRef, afterCursor = "0", limit = 100, signal } = {}) {
     await this.#ensureProfile({ signal });
-    const response = await this.#fetch(this.eventsUrl({ authorityContextRef, siteRef, afterCursor, limit }), { method: "GET", signal, headers: { Authorization: `Bearer ${this.#token}`, Accept: "text/event-stream" } });
+    let response;
+    try {
+      response = await this.#fetch(this.eventsUrl({ authorityContextRef, siteRef, afterCursor, limit }), { method: "GET", signal, headers: { Authorization: `Bearer ${this.#token}`, Accept: "text/event-stream" } });
+    } catch (cause) {
+      if (cause?.name === "AbortError") throw cause;
+      const error = new Error("gateway event stream unavailable", { cause });
+      error.code = "gateway_stream_failed";
+      throw error;
+    }
     if (!response.ok || !response.body) {
       const error = new Error(`gateway event stream failed with status ${response.status}`);
       error.code = "gateway_stream_failed";
