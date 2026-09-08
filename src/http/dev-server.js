@@ -139,6 +139,8 @@ export async function createStudioHttpServer({ env = process.env, store, service
         }
         const approvalMatch = url.pathname.match(/^\/api\/approvals\/([^/]+)\/approve$/);
         if (req.method === "POST" && approvalMatch) { const state = await effectiveStore.load(); const approval = state.approvals[approvalMatch[1]]; if (!approval) return json(res, 404, errorPayload("approval_not_found", "not_found")); if (approval.siteRef) requireSite(approval.siteRef); return json(res, 200, await effectiveService.approvalService.approve({ approvalRef: approvalMatch[1], approvedBy: "human.local" })); }
+        const approvalStatusMatch = url.pathname.match(/^\/api\/approvals\/([^/]+)$/);
+        if (req.method === "GET" && approvalStatusMatch) { const approval = await effectiveService.approvalService.get({ approvalRef: approvalStatusMatch[1] }); if (!approval) return json(res, 404, errorPayload("approval_not_found", "not_found")); if (approval.siteRef) requireSite(approval.siteRef); return json(res, 200, approval); }
         if (req.method === "POST" && url.pathname === "/api/actions/dispatch") {
           if (!effectiveService.actionService) return json(res, 503, errorPayload("home_assistant_not_configured", "configuration_unavailable"));
           const request = requestFromPayload(await readJsonObjectBody(req), effectiveService);

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { StateStore } from "../src/runtime/state-store.js";
+import { StateStore, emptyState } from "../src/runtime/state-store.js";
 import { FixtureActionTarget } from "../src/actions/fixture-target.js";
 import { ActionService } from "../src/actions/action-service.js";
 import { ApprovalService } from "../src/actions/approval-service.js";
@@ -95,6 +95,18 @@ test("requires local human approval for an approval-marked action", async () => 
   await approvals.approve({ approvalRef: pending.approvalRef, approvedBy: "human.local" });
   const admitted = await actions.authorizeDispatch({ ...gated, approvalRef: pending.approvalRef });
   assert.equal(admitted.action.status, "admitted");
+});
+
+test("approval status reads expose expiry and preserve audit evidence", async () => {
+  const store = new StateStore({ state: emptyState() });
+  let now = new Date("2026-09-08T12:00:00Z");
+  const approvals = new ApprovalService({ store, clock: () => now });
+  const approval = await approvals.request({ request: { principalRef: "agent.fixture", capabilityRef: "home.light.set_level", operation: "light.set_level", siteRef: "home.one", targetEntityId: "light.kitchen", parameters: { level: 0.4 } }, requestedBy: "principal.studio", expiresInMs: 1000 });
+  assert.equal((await approvals.get({ approvalRef: approval.approvalRef })).status, "pending");
+  now = new Date("2026-09-08T12:00:01.001Z");
+  assert.equal((await approvals.get({ approvalRef: approval.approvalRef })).status, "expired");
+  assert.equal((await store.load()).audit.at(-1).type, "approval.expired");
+  assert.equal(await approvals.get({ approvalRef: "missing" }), null);
 });
 
 test("live effects require an explicit runtime enablement flag", async () => {

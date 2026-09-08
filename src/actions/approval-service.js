@@ -43,6 +43,19 @@ export class ApprovalService {
     return result.result.approval;
   }
 
+  async get({ approvalRef }) {
+    const result = await this.#store.transaction((state) => {
+      const approval = state.approvals[approvalRef];
+      if (!approval) return null;
+      if (approval.status === "pending" && new Date(approval.expiresAt) <= this.#clock()) {
+        approval.status = "expired";
+        state.audit.push({ type: "approval.expired", approvalRef, recordedAt: this.#clock().toISOString() });
+      }
+      return approval;
+    });
+    return result.result;
+  }
+
   async verify({ approvalRef, request }) {
     const state = await this.#store.load();
     const approval = state.approvals[approvalRef];
