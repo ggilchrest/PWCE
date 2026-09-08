@@ -57,7 +57,18 @@ export class PwceAgentGatewayClient {
 
   async bundle(options) {
     await this.#ensureProfile(options);
-    return this.#json("/gateway/v1/bundle", options);
+    const bundle = await this.#json("/gateway/v1/bundle", options);
+    const compatible = bundle.bundleId === gatewayBundle.bundleId
+      && bundle.bundleVersion === gatewayBundle.bundleVersion
+      && bundle.bundleDigest === gatewayBundle.bundleDigest
+      && JSON.stringify(bundle.artifacts) === JSON.stringify(gatewayBundle.artifacts)
+      && JSON.stringify(bundle.generatedClient) === JSON.stringify(gatewayBundle.generatedClient);
+    if (!compatible) {
+      const error = new Error("incompatible gateway bundle");
+      error.code = "incompatible_gateway_bundle";
+      throw error;
+    }
+    return bundle;
   }
 
   async #ensureProfile(options) {

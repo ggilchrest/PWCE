@@ -32,6 +32,19 @@ test("generated gateway client negotiates before issuing authority", async () =>
   assert.deepEqual(paths, ["http://pwce.local/gateway/v1/profile", "http://pwce.local/gateway/v1/authority"]);
 });
 
+test("generated gateway client verifies the published bundle descriptor", async () => {
+  const profile = { profileId: "pwce-agent-gateway.v1", profileVersion: "1.0.0", bundleId: "pwce-agent-gateway.bundle.v1", bundleVersion: "1.0.0", schemaStatus: "published", schemaDigest: "32c555ba675b61b4c1ec82245e314a8f6ca537484defbeb48b9fe1b6bdf4e2e2", operationCatalogVersion: "0.1.0", operationCatalogDigest: "445cb4e4b9811a26a41c5821c7d68b09f377b69d24d42ec6dcd0acec5d950b65" };
+  const bundle = { bundleId: "pwce-agent-gateway.bundle.v1", bundleVersion: "1.0.0", bundleDigest: "32c555ba675b61b4c1ec82245e314a8f6ca537484defbeb48b9fe1b6bdf4e2e2", artifacts: [], generatedClient: { path: "src/gateway/generated-client.js", status: "checked_in", sha256: "9ea91dab7359a9c52d55ecb4f081b8eb9a0dff5ed90ea3272220637660b80406" } };
+  let bundleCalls = 0;
+  const client = new PwceAgentGatewayClient({ baseUrl: "http://pwce.local", token: "gateway-test-token", fetchImpl: async (url) => {
+    if (url.endsWith("/profile")) return new Response(JSON.stringify(profile), { status: 200 });
+    bundleCalls += 1;
+    return new Response(JSON.stringify(bundle), { status: 200 });
+  } });
+  await assert.rejects(() => client.bundle(), { code: "incompatible_gateway_bundle" });
+  assert.equal(bundleCalls, 1);
+});
+
 test("generated gateway client parses bounded invalidation SSE frames", async () => {
   const client = new PwceAgentGatewayClient({ baseUrl: "http://pwce.local", token: "gateway-test-token", fetchImpl: async (url) => {
     if (url.endsWith("/profile")) return new Response(JSON.stringify({ profileId: "pwce-agent-gateway.v1", profileVersion: "1.0.0", bundleId: "pwce-agent-gateway.bundle.v1", bundleVersion: "1.0.0", schemaStatus: "published", schemaDigest: "32c555ba675b61b4c1ec82245e314a8f6ca537484defbeb48b9fe1b6bdf4e2e2", operationCatalogVersion: "0.1.0", operationCatalogDigest: "445cb4e4b9811a26a41c5821c7d68b09f377b69d24d42ec6dcd0acec5d950b65" }), { status: 200 });
