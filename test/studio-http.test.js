@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createStudioHttpServer, errorPayload, listAuthorizedSites } from "../src/http/dev-server.js";
+import { createStudioHttpServer, errorPayload, issueStudioSession, listAuthorizedSites } from "../src/http/dev-server.js";
+import { createStudioSessionRegistry } from "../src/http/studio-auth.js";
 import { StateStore, emptyState } from "../src/runtime/state-store.js";
 import { createStudioService } from "../src/studio/studio-service.js";
 
@@ -95,4 +96,12 @@ test("Studio stop reports offline and ignores late adapter status", async () => 
 test("Studio HTTP errors include stable codes while preserving messages", () => {
   assert.deepEqual(errorPayload("route_not_found", "not_found"), { error: "route_not_found", code: "not_found" });
   assert.deepEqual(errorPayload("site is outside Studio authority", "scope_denied"), { error: "site is outside Studio authority", code: "scope_denied" });
+});
+
+test("Studio session bootstrap requires the configured bearer token", async () => {
+  const sessions = createStudioSessionRegistry();
+  assert.throws(() => issueStudioSession({ configuredToken: "local-secret", sessions, siteRefs: ["home.one"] }), { code: "authentication_required", statusCode: 401 });
+  const result = issueStudioSession({ authorization: "Bearer local-secret", configuredToken: "local-secret", sessions, siteRefs: ["home.one"] });
+  assert.equal(result.transport, "bearer_bootstrap");
+  assert.deepEqual(sessions.get(result.session.sessionRef).siteRefs, ["home.one"]);
 });

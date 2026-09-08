@@ -3,4 +3,4 @@
 | Feature | Journey page | QA script | Entry points | Key source paths | Last updated |
 |---|---|---|---|---|---|
 | Ask the home with the local Basic Agent | manual/ask-the-home.html | qa/ask-the-home.html | `/`, `/api/agent`, `/api/agent/message` | `src/agent/`, `src/studio/`, `src/http/` | 2026-09-07 |
-| Inspect local context and request a safe action | manual/inspect-local-context.html | qa/inspect-local-context.html | `/`, `/api/health`, `/api/sites`, `/api/context/current`, `/api/actions/preview`, `/api/approvals`, `/api/actions/dispatch` | `src/studio/`, `src/http/`, `src/actions/` | 2026-09-07 |
+| Inspect local context and request a safe action | manual/inspect-local-context.html | qa/inspect-local-context.html | `/`, `/api/session`, `/api/health`, `/api/sites`, `/api/context/current`, `/api/actions/preview`, `/api/approvals`, `/api/actions/dispatch` | `src/studio/`, `src/http/`, `src/actions/` | 2026-09-08 |

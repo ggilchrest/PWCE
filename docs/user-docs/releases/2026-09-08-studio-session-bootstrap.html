@@ -1,0 +1,8 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Protected Studio session bootstrap — PWCE</title><link rel="stylesheet" href="../assets/docs.css"></head>
+<body><header class="doc-header"><a href="../manual/index.html">PWCE User Manual</a><span class="doc-meta">Release note · 2026-09-08</span></header><main>
+<h1>Protected Studio session bootstrap</h1><p>When you configure <code>PWCE_STUDIO_TOKEN</code>, Studio now requires the matching bearer token before it creates a browser session. This prevents an unauthenticated caller from obtaining a session that can inspect local data or request actions.</p>
+<h2>What to test</h2><ul><li><a href="../qa/inspect-local-context.html">Inspect local context and request a safe action</a> — verify that an unauthenticated session request is rejected and a matching bearer token creates the session.</li></ul>
+<h2>Documentation updated</h2><ul><li>Updated the inspect-local-context QA preconditions, edge cases, and change history.</li><li>No screenshots changed; the behavior is an HTTP bootstrap response before the Studio page loads.</li></ul>
+</main><footer class="doc-footer">PWCE release notes · Updated 2026-09-08</footer></body></html>

@@ -31,6 +31,18 @@ export function errorPayload(message, code) {
   return { error: message, code: code ?? message };
 }
 
+export function issueStudioSession({ authorization, configuredToken, sessions, siteRefs }) {
+  const bootstrapContext = getStudioContext({ authorization, configuredToken, sessions, siteRefs });
+  if (configuredToken && !bootstrapContext) {
+    const error = new Error("studio_authentication_required");
+    error.code = "authentication_required";
+    error.statusCode = 401;
+    throw error;
+  }
+  const session = sessions.issue({ principalRef: bootstrapContext?.principalRef ?? "principal.studio", siteRefs: bootstrapContext?.siteRefs ?? siteRefs });
+  return { session, transport: bootstrapContext ? "bearer_bootstrap" : "local_session" };
+}
+
 function requestFromPayload(payload, service) {
   return {
     ...payload,
@@ -69,9 +81,9 @@ export async function createStudioHttpServer({ env = process.env, store, service
       if (await gatewayBinding.handle(req, res, url.pathname)) return;
       if (url.pathname.startsWith("/api/")) {
         if (req.method === "GET" && url.pathname === "/api/session") {
-          const session = sessions.issue({ siteRefs: effectiveService.siteRefs });
+          const { session, transport } = issueStudioSession({ authorization: req.headers.authorization, configuredToken: configuredStudioToken, sessions, siteRefs: effectiveService.siteRefs });
           res.writeHead(200, { ...SECURITY_HEADERS, "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "set-cookie": [`pwce_studio_session=${encodeURIComponent(session.sessionRef)}; HttpOnly; SameSite=Strict; Path=/`] });
-          return res.end(JSON.stringify({ authenticated: true, transport: "local_session", expiresAt: session.expiresAt }));
+          return res.end(JSON.stringify({ authenticated: true, transport, expiresAt: session.expiresAt }));
         }
         const cookies = parseCookies(req.headers.cookie);
         const studioContext = getStudioContext({ authorization: req.headers.authorization, cookie: cookies.pwce_studio_session, configuredToken: configuredStudioToken, sessions, siteRefs: effectiveService.siteRefs });
