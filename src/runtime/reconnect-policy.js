@@ -20,3 +20,11 @@ export function readReconnectConfig(env = process.env) {
   if (!Number.isInteger(maxAttempts)) throw new Error("PWCE_HA_RECONNECT_MAX_ATTEMPTS must be an integer");
   return { initialMs, maxMs, maxAttempts };
 }
+
+export function readHomeAssistantTimeoutConfig(env = process.env) {
+  const requestTimeoutMs = Number(env.PWCE_HA_REQUEST_TIMEOUT_MS ?? 10_000);
+  const websocketTimeoutMs = Number(env.PWCE_HA_WEBSOCKET_TIMEOUT_MS ?? 10_000);
+  if (!Number.isInteger(requestTimeoutMs) || requestTimeoutMs < 1 || requestTimeoutMs > 300_000) throw new Error("PWCE_HA_REQUEST_TIMEOUT_MS must be an integer from 1 to 300000");
+  if (!Number.isInteger(websocketTimeoutMs) || websocketTimeoutMs < 1 || websocketTimeoutMs > 300_000) throw new Error("PWCE_HA_WEBSOCKET_TIMEOUT_MS must be an integer from 1 to 300000");
+  return { requestTimeoutMs, websocketTimeoutMs };
+}

@@ -5,7 +5,7 @@ import { ApprovalService } from "../actions/approval-service.js";
 import { homeAssistantConfigFromEnv, resolveSecretReference } from "../config/home-assistant-config.js";
 import { ensureRegistration } from "../runtime/studio-registration.js";
 import { ingestObservation } from "../domain/observation-service.js";
-import { canReconnect, readReconnectConfig, reconnectDelay } from "../runtime/reconnect-policy.js";
+import { canReconnect, readHomeAssistantTimeoutConfig, readReconnectConfig, reconnectDelay } from "../runtime/reconnect-policy.js";
 
 const DEFAULT_ENTITY = "light.kitchen_lights";
 
@@ -27,6 +27,7 @@ export async function createStudioService({ store, env = process.env, fetchImpl 
   const configuredSiteRefs = [siteRef];
   let connectLive = async () => {};
   const { initialMs: reconnectInitialMs, maxMs: reconnectMaxMs, maxAttempts: reconnectMaxAttempts } = readReconnectConfig(env);
+  const { requestTimeoutMs, websocketTimeoutMs } = readHomeAssistantTimeoutConfig(env);
   const setSourceHealth = async (targetSourceRef, { status, reason, lastEventTime = null }) => {
     await store.transaction((state) => { const source = state.sources[targetSourceRef]; if (source) Object.assign(source, { status, lastStatusReason: reason, lastEventTime: lastEventTime ?? source.lastEventTime, statusChangedAt: new Date().toISOString(), revision: (source.revision ?? 0) + 1 }); });
   };
@@ -36,6 +37,8 @@ export async function createStudioService({ store, env = process.env, fetchImpl 
       resolveToken: (ref) => resolveSecretReference(ref, env),
       fetchImpl,
       websocketFactory,
+      requestTimeoutMs,
+      websocketTimeoutMs,
       onStatus: (status) => {
         if (stopped) return;
         void setSourceHealth(sourceRef, status);
@@ -128,6 +131,8 @@ export async function createStudioService({ store, env = process.env, fetchImpl 
       resolveToken: (ref) => resolveSecretReference(ref, env),
       fetchImpl,
       websocketFactory,
+      requestTimeoutMs,
+      websocketTimeoutMs,
       onStatus: (status) => { if (!stopped) { void setSourceHealth(secondaryConfig.sourceRef, status); if ((status.status === "degraded" || status.status === "offline") && !secondaryRuntime.connecting) scheduleSecondaryReconnect(status.reason); } }
     });
     secondaryRuntime.adapter = secondaryAdapter;

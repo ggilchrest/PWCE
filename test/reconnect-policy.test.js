@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canReconnect, readReconnectConfig, reconnectDelay } from "../src/runtime/reconnect-policy.js";
+import { canReconnect, readHomeAssistantTimeoutConfig, readReconnectConfig, reconnectDelay } from "../src/runtime/reconnect-policy.js";
 
 test("reconnect delay uses bounded exponential backoff", () => {
   assert.deepEqual([0, 1, 2, 3].map((attempt) => reconnectDelay({ initialMs: 100, maxMs: 250, attempt })), [100, 200, 250, 250]);
@@ -16,4 +16,10 @@ test("reconnect configuration fails fast when malformed", () => {
   assert.deepEqual(readReconnectConfig({ PWCE_HA_RECONNECT_INITIAL_MS: "250", PWCE_HA_RECONNECT_MAX_MS: "500", PWCE_HA_RECONNECT_MAX_ATTEMPTS: "0" }), { initialMs: 250, maxMs: 500, maxAttempts: 0 });
   assert.throws(() => readReconnectConfig({ PWCE_HA_RECONNECT_INITIAL_MS: "bad" }), /INITIAL_MS/);
   assert.throws(() => readReconnectConfig({ PWCE_HA_RECONNECT_INITIAL_MS: "500", PWCE_HA_RECONNECT_MAX_MS: "100" }), /MAX_MS/);
+});
+
+test("Home Assistant transport timeout configuration is bounded and explicit", () => {
+  assert.deepEqual(readHomeAssistantTimeoutConfig({ PWCE_HA_REQUEST_TIMEOUT_MS: "2500", PWCE_HA_WEBSOCKET_TIMEOUT_MS: "4000" }), { requestTimeoutMs: 2500, websocketTimeoutMs: 4000 });
+  assert.throws(() => readHomeAssistantTimeoutConfig({ PWCE_HA_REQUEST_TIMEOUT_MS: "0" }), /REQUEST_TIMEOUT_MS/);
+  assert.throws(() => readHomeAssistantTimeoutConfig({ PWCE_HA_WEBSOCKET_TIMEOUT_MS: "bad" }), /WEBSOCKET_TIMEOUT_MS/);
 });
