@@ -11,6 +11,7 @@ import { createStudioSessionRegistry, getStudioContext, parseCookies } from "./s
 import { createGatewayHttpBinding } from "./gateway-server.js";
 import { MAX_TRANSPORT_BYTES, readJsonBody } from "./json-body.js";
 import { BasicAgent } from "../agent/basic-agent.js";
+import { SECURITY_HEADERS } from "./security-headers.js";
 
 const root = resolve(fileURLToPath(new URL("../../", import.meta.url)));
 const studioRoot = join(root, "src", "studio");
@@ -19,10 +20,10 @@ const contentTypes = { ".html": "text/html; charset=utf-8", ".css": "text/css; c
 function json(res, status, value) {
   const encoded = JSON.stringify(value);
   if (Buffer.byteLength(encoded, "utf8") > MAX_TRANSPORT_BYTES) {
-    res.writeHead(500, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+    res.writeHead(500, { ...SECURITY_HEADERS, "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
     return res.end(JSON.stringify({ error: { code: "limit_exceeded", message: "response body exceeds the 1 MiB transport limit" } }));
   }
-  res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+  res.writeHead(status, { ...SECURITY_HEADERS, "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
   res.end(encoded);
 }
 
@@ -69,7 +70,7 @@ export async function createStudioHttpServer({ env = process.env, store, service
       if (url.pathname.startsWith("/api/")) {
         if (req.method === "GET" && url.pathname === "/api/session") {
           const session = sessions.issue({ siteRefs: effectiveService.siteRefs });
-          res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "set-cookie": [`pwce_studio_session=${encodeURIComponent(session.sessionRef)}; HttpOnly; SameSite=Strict; Path=/`] });
+          res.writeHead(200, { ...SECURITY_HEADERS, "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "set-cookie": [`pwce_studio_session=${encodeURIComponent(session.sessionRef)}; HttpOnly; SameSite=Strict; Path=/`] });
           return res.end(JSON.stringify({ authenticated: true, transport: "local_session", expiresAt: session.expiresAt }));
         }
         const cookies = parseCookies(req.headers.cookie);
@@ -120,7 +121,7 @@ export async function createStudioHttpServer({ env = process.env, store, service
       const file = resolve(studioRoot, `.${requested}`);
       if (!file.startsWith(`${studioRoot}/`)) return json(res, 404, errorPayload("not_found", "not_found"));
       const content = await readFile(file);
-      res.writeHead(200, { "content-type": contentTypes[extname(file)] ?? "application/octet-stream", "cache-control": "no-store" });
+      res.writeHead(200, { ...SECURITY_HEADERS, "content-type": contentTypes[extname(file)] ?? "application/octet-stream", "cache-control": "no-store" });
       res.end(content);
     } catch (error) {
       json(res, error.statusCode ?? (/not found/i.test(error.message) ? 404 : 400), errorPayload(error.message, error.code ?? "request_failed"));

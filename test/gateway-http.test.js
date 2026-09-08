@@ -9,12 +9,12 @@ function store() {
 }
 
 async function invoke(binding, { pathname, method = "GET", authorization, payload, contentLength } = {}) {
-  let status; let value; const chunks = [];
+  let status; let responseHeaders; let value; const chunks = [];
   const parsed = new URL(pathname, "http://127.0.0.1");
   const req = { method, url: `${parsed.pathname}${parsed.search}`, headers: { authorization, ...(contentLength === undefined ? {} : { "content-length": String(contentLength) }) }, async *[Symbol.asyncIterator]() { if (payload) yield JSON.stringify(payload); } };
-  const res = { writeHead(code) { status = code; }, write(text) { chunks.push(text); }, end(text) { value = text ? JSON.parse(text) : chunks.join(""); } };
+  const res = { writeHead(code, headers) { status = code; responseHeaders = headers; }, write(text) { chunks.push(text); }, end(text) { value = text ? JSON.parse(text) : chunks.join(""); } };
   await binding.handle(req, res, parsed.pathname);
-  return { status, value };
+  return { status, responseHeaders, value };
 }
 
 test("authenticated gateway HTTP binding issues authority and delegates requests", async () => {
@@ -35,6 +35,9 @@ test("authenticated gateway HTTP binding issues authority and delegates requests
   assert.equal(bundle.value.bundleDigest, profile.value.schemaDigest);
   assert.equal(bundle.value.generatedClient.path, "src/gateway/generated-client.js");
   assert.equal(profile.value.health.status, "development");
+  assert.equal(profile.responseHeaders["x-content-type-options"], "nosniff");
+  assert.equal(profile.responseHeaders["referrer-policy"], "no-referrer");
+  assert.match(profile.responseHeaders["content-security-policy"], /frame-ancestors 'none'/);
   assert.equal(profile.value.compatibilityRange.minimum, "1.0.0");
   const authorityResponse = await invoke(binding, { pathname: "/gateway/v1/authority", method: "POST", authorization: "Bearer gateway-test-token", payload: { siteRefs: ["home.one"] } });
   assert.equal(authorityResponse.status, 201);

@@ -3,15 +3,16 @@ import { GatewayService, gatewayProfile } from "../gateway/gateway-service.js";
 import { gatewayBundle } from "../gateway/gateway-bundle.js";
 import { validateAuthorityRequest } from "./gateway-contract.js";
 import { MAX_TRANSPORT_BYTES, readJsonBody } from "./json-body.js";
+import { SECURITY_HEADERS } from "./security-headers.js";
 
 function json(res, status, value) {
   const encoded = JSON.stringify(value);
   if (Buffer.byteLength(encoded, "utf8") > MAX_TRANSPORT_BYTES) {
-    res.writeHead(500, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+    res.writeHead(500, { ...SECURITY_HEADERS, "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
     res.end(JSON.stringify({ error: { code: "limit_exceeded", message: "response body exceeds the 1 MiB transport limit" } }));
     return;
   }
-  res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+  res.writeHead(status, { ...SECURITY_HEADERS, "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
   res.end(encoded);
 }
 
@@ -42,7 +43,7 @@ function sse(res, result) {
     error.code = "limit_exceeded";
     throw error;
   }
-  res.writeHead(200, { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-store", connection: "keep-alive" });
+  res.writeHead(200, { ...SECURITY_HEADERS, "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-store", connection: "keep-alive" });
   const writeEvent = (event) => {
     const frame = frameFor(event);
     if (Buffer.byteLength(frame, "utf8") > MAX_TRANSPORT_BYTES) { res.end(); return; }
