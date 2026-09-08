@@ -31,6 +31,11 @@ test("generated gateway client types request connectivity failures", async () =>
   await assert.rejects(() => client.profile(), { code: "gateway_request_failed", message: "gateway request unavailable" });
 });
 
+test("generated gateway client types response read failures", async () => {
+  const client = new PwceAgentGatewayClient({ baseUrl: "http://pwce.local", token: "gateway-test-token", fetchImpl: async () => ({ ok: true, arrayBuffer: async () => { throw new TypeError("body read failed"); } }) });
+  await assert.rejects(() => client.profile(), { code: "gateway_request_failed", message: "gateway response unavailable" });
+});
+
 test("generated gateway client types malformed JSON responses", async () => {
   const client = new PwceAgentGatewayClient({ baseUrl: "http://pwce.local", token: "gateway-test-token", fetchImpl: async () => new Response("not-json", { status: 200 }) });
   await assert.rejects(() => client.profile(), { code: "invalid_gateway_response" });
@@ -47,6 +52,14 @@ test("generated gateway client types event-stream connectivity failures", async 
   const client = new PwceAgentGatewayClient({ baseUrl: "http://pwce.local", token: "gateway-test-token", fetchImpl: async (url) => {
     if (url.endsWith("/profile")) return new Response(JSON.stringify({ profileId: "pwce-agent-gateway.v1", profileVersion: "1.0.0", bundleId: "pwce-agent-gateway.bundle.v1", bundleVersion: "1.0.0", schemaStatus: "published", schemaDigest: "32c555ba675b61b4c1ec82245e314a8f6ca537484defbeb48b9fe1b6bdf4e2e2", operationCatalogVersion: "0.1.0", operationCatalogDigest: "445cb4e4b9811a26a41c5821c7d68b09f377b69d24d42ec6dcd0acec5d950b65" }), { status: 200 });
     throw new TypeError("connection refused");
+  } });
+  await assert.rejects(() => client.subscribeInvalidations({ authorityContextRef: "authority.fixture", siteRef: "home.one" }).next(), { code: "gateway_stream_failed", message: "gateway event stream unavailable" });
+});
+
+test("generated gateway client types event-stream read failures", async () => {
+  const client = new PwceAgentGatewayClient({ baseUrl: "http://pwce.local", token: "gateway-test-token", fetchImpl: async (url) => {
+    if (url.endsWith("/profile")) return new Response(JSON.stringify({ profileId: "pwce-agent-gateway.v1", profileVersion: "1.0.0", bundleId: "pwce-agent-gateway.bundle.v1", bundleVersion: "1.0.0", schemaStatus: "published", schemaDigest: "32c555ba675b61b4c1ec82245e314a8f6ca537484defbeb48b9fe1b6bdf4e2e2", operationCatalogVersion: "0.1.0", operationCatalogDigest: "445cb4e4b9811a26a41c5821c7d68b09f377b69d24d42ec6dcd0acec5d950b65" }), { status: 200 });
+    return { ok: true, body: { getReader: () => ({ read: async () => { throw new TypeError("stream read failed"); }, releaseLock() {} }) } };
   } });
   await assert.rejects(() => client.subscribeInvalidations({ authorityContextRef: "authority.fixture", siteRef: "home.one" }).next(), { code: "gateway_stream_failed", message: "gateway event stream unavailable" });
 });

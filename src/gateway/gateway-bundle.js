@@ -11,5 +11,5 @@ export const gatewayBundle = Object.freeze({
     Object.freeze({ path: "contracts/gateway/pwce-agent-gateway-authority-request.schema.json", sha256: "c88e5eb7bb98c867ed5e0a2bf71c4e58f012aa068ecd8fc93cd40caecc42b318" }),
     Object.freeze({ path: "contracts/gateway/pwce-agent-gateway-authority-response.schema.json", sha256: "b064fc855886a63beb7ca934cdef8f2c51a20e9244c399a0d19afeb635a2c82f" })
   ]),
-  generatedClient: Object.freeze({ path: "src/gateway/generated-client.js", sha256: "f6033ec2a7a9d573f66e95f0df734e98dc07e9504c183441eff2f7860f8e24f7" })
+  generatedClient: Object.freeze({ path: "src/gateway/generated-client.js", sha256: "fdb2a5a425b1a54e0d41c923e6ae701eb865e710334869c885b499f06abde175" })
 });

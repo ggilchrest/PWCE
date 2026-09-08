@@ -36,7 +36,15 @@ export class PwceAgentGatewayClient {
       error.code = "gateway_request_failed";
       throw error;
     }
-    const responseBytes = await response.arrayBuffer();
+    let responseBytes;
+    try {
+      responseBytes = await response.arrayBuffer();
+    } catch (cause) {
+      if (cause?.name === "AbortError") throw cause;
+      const error = new Error("gateway response unavailable", { cause });
+      error.code = "gateway_request_failed";
+      throw error;
+    }
     if (responseBytes.byteLength > MAX_TRANSPORT_BYTES) {
       const error = new Error("response body exceeds the 1 MiB transport limit");
       error.code = "limit_exceeded";
@@ -170,6 +178,11 @@ export class PwceAgentGatewayClient {
         }
         if (chunk.done) { const parsed = emit(); if (parsed) yield parsed; break; }
       }
+    } catch (cause) {
+      if (cause?.name === "AbortError" || cause?.code) throw cause;
+      const error = new Error("gateway event stream unavailable", { cause });
+      error.code = "gateway_stream_failed";
+      throw error;
     } finally {
       reader.releaseLock();
     }
