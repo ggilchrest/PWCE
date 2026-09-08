@@ -8,10 +8,10 @@ function store() {
   return new StateStore({ state: { schemaVersion: 1, worldRef: "world.personal.v1", revision: 0, sites: {}, sources: {}, entities: {}, observations: [], idempotencyKeys: {}, projections: {}, actions: {}, approvals: {}, audit: [] } });
 }
 
-async function invoke(binding, { pathname, method = "GET", authorization, payload } = {}) {
+async function invoke(binding, { pathname, method = "GET", authorization, payload, contentLength } = {}) {
   let status; let value; const chunks = [];
   const parsed = new URL(pathname, "http://127.0.0.1");
-  const req = { method, url: `${parsed.pathname}${parsed.search}`, headers: { authorization }, async *[Symbol.asyncIterator]() { if (payload) yield JSON.stringify(payload); } };
+  const req = { method, url: `${parsed.pathname}${parsed.search}`, headers: { authorization, ...(contentLength === undefined ? {} : { "content-length": String(contentLength) }) }, async *[Symbol.asyncIterator]() { if (payload) yield JSON.stringify(payload); } };
   const res = { writeHead(code) { status = code; }, write(text) { chunks.push(text); }, end(text) { value = text ? JSON.parse(text) : chunks.join(""); } };
   await binding.handle(req, res, parsed.pathname);
   return { status, value };
@@ -109,6 +109,13 @@ test("HTTP authority rejects payloads outside the published request schema", asy
 test("HTTP gateway rejects request bodies over the shared transport limit", async () => {
   const binding = createGatewayHttpBinding({ store: store(), token: "gateway-test-token", siteRefs: ["home.one"] });
   const response = await invoke(binding, { pathname: "/gateway/v1/authority", method: "POST", authorization: "Bearer gateway-test-token", payload: { siteRefs: ["home.one"], padding: "x".repeat(1_048_550) } });
+  assert.equal(response.status, 400);
+  assert.equal(response.value.error.code, "limit_exceeded");
+});
+
+test("HTTP gateway rejects an oversized declared content length before parsing", async () => {
+  const binding = createGatewayHttpBinding({ store: store(), token: "gateway-test-token", siteRefs: ["home.one"] });
+  const response = await invoke(binding, { pathname: "/gateway/v1/authority", method: "POST", authorization: "Bearer gateway-test-token", payload: { siteRefs: ["home.one"] }, contentLength: 1_048_577 });
   assert.equal(response.status, 400);
   assert.equal(response.value.error.code, "limit_exceeded");
 });

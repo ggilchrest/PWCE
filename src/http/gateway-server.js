@@ -17,6 +17,12 @@ function json(res, status, value) {
 const MAX_REQUEST_BYTES = 1_048_576;
 
 async function body(req) {
+  const declaredLength = Number(req.headers?.["content-length"] ?? req.headers?.["Content-Length"]);
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_REQUEST_BYTES) {
+    const error = new Error("request body exceeds the 1 MiB transport limit");
+    error.code = "limit_exceeded";
+    throw error;
+  }
   let text = "";
   let byteLength = 0;
   for await (const chunk of req) {
