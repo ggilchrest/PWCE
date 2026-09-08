@@ -18,6 +18,17 @@ test("Home Assistant adapter uses a secret reference and bearer REST boundary", 
   assert.equal(JSON.stringify(await adapter.configuration).includes("transient-token"), false);
 });
 
+test("Home Assistant REST requests abort after the configured timeout", async () => {
+  let signal;
+  const adapter = new HomeAssistantAdapter({ store: store(), config: { baseUrl: "http://ha.local:8123", tokenRef: "secret://ha/one", siteRef: "home.one", sourceRef: "ha.one" }, requestTimeoutMs: 5, resolveToken: async () => "transient-token", fetchImpl: async (_url, options) => {
+    signal = options.signal;
+    await new Promise((resolve, reject) => { signal.addEventListener("abort", () => reject(new Error("request aborted")), { once: true }); });
+    return new Response("{}", { status: 200 });
+  } });
+  await assert.rejects(() => adapter.getState("sensor.temperature"), /request aborted/);
+  assert.equal(signal.aborted, true);
+});
+
 test("Home Assistant WebSocket boundary authenticates, subscribes, and normalizes state events", async () => {
   const sent = [];
   const socket = { send: (message) => sent.push(JSON.parse(message)), close: () => {}, onmessage: null, onerror: null, onclose: null };

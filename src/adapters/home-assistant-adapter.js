@@ -14,9 +14,11 @@ export class HomeAssistantAdapter {
   #subscriptionMessageId = null;
   #eventHandler;
   #onStatus;
+  #requestTimeoutMs;
 
-  constructor({ store, config, resolveToken, fetchImpl = globalThis.fetch, websocketFactory = (url) => new WebSocket(url), now = () => new Date(), onStatus = () => {} }) {
+  constructor({ store, config, resolveToken, fetchImpl = globalThis.fetch, websocketFactory = (url) => new WebSocket(url), now = () => new Date(), onStatus = () => {}, requestTimeoutMs = 10_000 }) {
     if (!config?.baseUrl || !config?.tokenRef || !config?.siteRef || !config?.sourceRef) throw new Error("Home Assistant adapter requires baseUrl, tokenRef, siteRef, and sourceRef");
+    if (!Number.isInteger(requestTimeoutMs) || requestTimeoutMs < 1) throw new Error("Home Assistant request timeout must be a positive integer");
     this.#store = store;
     this.#config = { ...config, baseUrl: config.baseUrl.replace(/\/$/, "") };
     this.#resolveToken = resolveToken;
@@ -24,6 +26,7 @@ export class HomeAssistantAdapter {
     this.#websocketFactory = websocketFactory;
     this.#now = now;
     this.#onStatus = onStatus;
+    this.#requestTimeoutMs = requestTimeoutMs;
   }
 
   get configuration() {
@@ -115,7 +118,13 @@ export class HomeAssistantAdapter {
   async #request(path, options = {}) {
     const token = await this.#resolveToken(this.#config.tokenRef);
     if (!token) throw new Error("Home Assistant token reference could not be resolved");
-    return this.#fetch(`${this.#config.baseUrl}${path}`, { ...options, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(options.headers ?? {}) } });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.#requestTimeoutMs);
+    try {
+      return await this.#fetch(`${this.#config.baseUrl}${path}`, { ...options, signal: controller.signal, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(options.headers ?? {}) } });
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   #normalizeState(state) {
