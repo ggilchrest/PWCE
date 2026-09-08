@@ -12,6 +12,7 @@ This checklist records the current Lifestream integration boundary without claim
 | Authenticated Lifestream client negotiates and queries the real local PWCE gateway | `pass` | `DEVELOPMENT-BATCH-118.md`; 3 Lifestream client tests passed against `http://127.0.0.1:4183` |
 | Full core mapping acceptance against the real gateway | `deferred` | Lifestream evidence explicitly does not claim live PWCE adapter acceptance |
 | Selected optional gateway profiles | `not_selected` | No optional inference, speech, renderer-host, or plugin-operations profile is selected by the current PWCE tier |
-| Lifestream VoxCPM2 provider evidence | `deferred` | Lifestream `LS-S029` remains blocked on cancellation fencing, expressive degradation, source-lock hashes, dependency/image provenance, and deployment receipt |
+| Lifestream VoxCPM2 development-host evidence | `pass` | Lifestream `implementation/evidence/LS-S029.json` at revision `46fea7c`; deterministic lifecycle, expressive delivery, restart, 384 real synthesis requests, and 19 cancellation probes passed |
+| Lifestream VoxCPM2 production acceptance | `deferred` | Final native-Linux production hardware, production voice identity, and subjective emotional-fidelity acceptance remain outside the development-host claim |
 
 The checklist does not claim Lifestream persona, memory, Dreaming, cognition, endpoint, handoff, embodiment, or provider acceptance. Those remain Lifestream-owned outcomes.
