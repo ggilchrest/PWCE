@@ -15,10 +15,12 @@ export class HomeAssistantAdapter {
   #eventHandler;
   #onStatus;
   #requestTimeoutMs;
+  #websocketTimeoutMs;
 
-  constructor({ store, config, resolveToken, fetchImpl = globalThis.fetch, websocketFactory = (url) => new WebSocket(url), now = () => new Date(), onStatus = () => {}, requestTimeoutMs = 10_000 }) {
+  constructor({ store, config, resolveToken, fetchImpl = globalThis.fetch, websocketFactory = (url) => new WebSocket(url), now = () => new Date(), onStatus = () => {}, requestTimeoutMs = 10_000, websocketTimeoutMs = 10_000 }) {
     if (!config?.baseUrl || !config?.tokenRef || !config?.siteRef || !config?.sourceRef) throw new Error("Home Assistant adapter requires baseUrl, tokenRef, siteRef, and sourceRef");
     if (!Number.isInteger(requestTimeoutMs) || requestTimeoutMs < 1) throw new Error("Home Assistant request timeout must be a positive integer");
+    if (!Number.isInteger(websocketTimeoutMs) || websocketTimeoutMs < 1) throw new Error("Home Assistant WebSocket timeout must be a positive integer");
     this.#store = store;
     this.#config = { ...config, baseUrl: config.baseUrl.replace(/\/$/, "") };
     this.#resolveToken = resolveToken;
@@ -27,6 +29,7 @@ export class HomeAssistantAdapter {
     this.#now = now;
     this.#onStatus = onStatus;
     this.#requestTimeoutMs = requestTimeoutMs;
+    this.#websocketTimeoutMs = websocketTimeoutMs;
   }
 
   get configuration() {
@@ -57,14 +60,22 @@ export class HomeAssistantAdapter {
     this.#onStatus({ status: "connecting", reason: "websocket_connecting" });
     return new Promise((resolve, reject) => {
       let settled = false;
+      let timeout;
       const current = () => this.#socket === socket && this.#connectionId === connectionId;
       const failConnection = (error) => {
         if (settled) return;
         settled = true;
+        clearTimeout(timeout);
         if (this.#pendingConnectionReject === reject) this.#pendingConnectionReject = null;
         reject(error);
       };
       this.#pendingConnectionReject = reject;
+      timeout = setTimeout(() => {
+        if (!current()) return;
+        this.#onStatus({ status: "degraded", reason: "websocket_authentication_timeout" });
+        failConnection(new Error("Home Assistant WebSocket authentication timed out"));
+      }, this.#websocketTimeoutMs);
+      timeout.unref?.();
       socket.onmessage = async ({ data }) => {
         if (!current()) return;
         let message;
@@ -79,6 +90,7 @@ export class HomeAssistantAdapter {
           socket.send(JSON.stringify({ id: this.#subscriptionMessageId, type: "subscribe_events", event_type: "state_changed" }));
           this.#onStatus({ status: "online", reason: "websocket_authenticated", haVersion: message.ha_version ?? null });
           settled = true;
+          clearTimeout(timeout);
           if (this.#pendingConnectionReject === reject) this.#pendingConnectionReject = null;
           resolve({ status: "online", haVersion: message.ha_version ?? null });
         } else if (message.type === "result" && message.id === this.#subscriptionMessageId && message.success === false) {

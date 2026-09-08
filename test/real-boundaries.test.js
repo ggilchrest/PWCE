@@ -29,6 +29,14 @@ test("Home Assistant REST requests abort after the configured timeout", async ()
   assert.equal(signal.aborted, true);
 });
 
+test("Home Assistant WebSocket authentication fails after the configured timeout", async () => {
+  const socket = { send() {}, close() {}, onmessage: null, onerror: null, onclose: null };
+  const statuses = [];
+  const adapter = new HomeAssistantAdapter({ store: store(), config: { baseUrl: "http://ha.local:8123", tokenRef: "secret://ha/one", siteRef: "home.one", sourceRef: "ha.one" }, websocketTimeoutMs: 5, resolveToken: async () => "transient-token", websocketFactory: () => socket, onStatus: (status) => statuses.push(status) });
+  await assert.rejects(() => adapter.subscribeStateChanges(async () => {}), /timed out/);
+  assert.equal(statuses.at(-1).reason, "websocket_authentication_timeout");
+});
+
 test("Home Assistant WebSocket boundary authenticates, subscribes, and normalizes state events", async () => {
   const sent = [];
   const socket = { send: (message) => sent.push(JSON.parse(message)), close: () => {}, onmessage: null, onerror: null, onclose: null };
