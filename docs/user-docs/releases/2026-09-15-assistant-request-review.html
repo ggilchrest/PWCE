@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Review Assistant action requests — PWCE</title><link rel="stylesheet" href="../assets/docs.css"></head>
+<body><header class="doc-header"><a href="../manual/index.html">PWCE User Manual</a><span class="doc-meta">2026-09-15 · Development Batch 170</span></header><main>
+<h1>Review Assistant action requests</h1><h2>What changed</h2><p>Studio now has a separate panel for pending Assistant actions. Each request has an identifier, a status and labeled fields for its target, effect and audience. You approve after signing in with your password or recovery code. Approval does not send the action.</p><p>Requests stay within the selected site, with five per page. Phone layouts wrap cleanly, and reloading preserves your valid Human session.</p>
+<h2>Why it matters</h2><p>You can inspect exactly what you are approving, while the requesting Assistant must separately resume the same action.</p>
+<h2>What to test</h2><ul><li><a href="../qa/inspect-local-context.html#assistant-approval">Inspect local context QA</a> — focus on exact fields, separate approval and dispatch, expiry, keyboard use, phone layout and sign-out.</li></ul>
+<h2>Where to read more</h2><p><a href="../manual/inspect-local-context.html#assistant-approval">Review an Assistant action request</a>.</p>
+<h2>Screenshots updated</h2><ul><li>inspect-local-context-01-studio-overview.png — new request panel.</li><li>gateway-review-02-scope-desktop.png — expanded desktop review.</li><li>gateway-review-03-scope-mobile.png — stacked phone review.</li><li>gateway-review-04-approved.png — recorded approval with no dispatch.</li></ul>
+<h2>Known issues / follow-ups</h2><p><a href="../../../PV1-T5-CHECKLIST.md">Full Lifestream action integration and physical target checks</a> remain in progress. These screenshots and checks use a synthetic target. Saved services and live-effect settings were not changed.</p>
+</main><footer class="doc-footer">PWCE release notes · 2026-09-15</footer></body></html>

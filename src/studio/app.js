@@ -1,9 +1,11 @@
+import { initializeGatewayApprovals } from './gateway-approvals.js';
 const $ = (id) => document.getElementById(id);
 const entityId = "light.kitchen_lights";
 let selectedSiteRef = "home.one";
 let authorizedSiteRefs = ["home.one"];
 let latestRequest = null;
 let latestApproval = null;
+const gatewayApprovals = initializeGatewayApprovals({ api, selectedSite: () => selectedSiteRef === '__all__' ? null : selectedSiteRef });
 
 async function api(path, options = {}) {
   const response = await fetch(path, { headers: { "content-type": "application/json" }, ...options });
@@ -60,9 +62,10 @@ async function loadSites() {
   select.value = selectedSiteRef;
   select.disabled = result.sites.length < 2;
   $("site-detail").textContent = `${selectedSiteRef} · Site-qualified context`;
+  gatewayApprovals.reset(); await gatewayApprovals.load();
 }
-$("site-select").addEventListener("change", async (event) => { selectedSiteRef = event.target.value; latestRequest = null; latestApproval = null; $("preview").disabled = isAggregate(); $("explain").disabled = isAggregate(); $("request-approval").disabled = true; $("approve").disabled = true; $("dispatch").disabled = true; await refresh(); });
+$("site-select").addEventListener("change", async (event) => { selectedSiteRef = event.target.value; latestRequest = null; latestApproval = null; gatewayApprovals.reset(); await gatewayApprovals.load(); $("preview").disabled = isAggregate(); $("explain").disabled = isAggregate(); $("request-approval").disabled = true; $("approve").disabled = true; $("dispatch").disabled = true; await refresh(); });
 async function bootstrap() { try { await api("/api/session"); showStudio(); await loadSites(); await refresh(); } catch (error) { setNotice(`Sign in required: ${error.message}`, "error"); showAuth(); } }
 $("auth-form").addEventListener("submit", async (event) => { event.preventDefault(); const recoveryCode = $("auth-recovery").value.trim(); const username = $("auth-username").value.trim(); const password = $("auth-password").value; if (!recoveryCode && (!username || !password)) { showAuth("Enter your username and password, or provide a recovery code."); return; } const payload = recoveryCode ? { recoveryCode } : { username, password }; try { await api("/api/session", { method: "POST", body: JSON.stringify(payload) }); showStudio(); await loadSites(); await refresh(); } catch (error) { showAuth(error.message); } });
-$("logout").addEventListener("click", async () => { await api("/api/session/logout", { method: "POST" }); showAuth(); setNotice("Signed out of Studio"); });
+$("logout").addEventListener("click", async () => { await api("/api/session/logout", { method: "POST" }); gatewayApprovals.reset(); showAuth(); setNotice("Signed out of Studio"); });
 bootstrap();

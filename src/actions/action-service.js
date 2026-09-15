@@ -127,11 +127,17 @@ export class ActionService {
     const grant = this.#grants.get(request.principalRef);
     if (!grant?.siteRefs.has(request.siteRef) || !grant.capabilityRefs.has(request.capabilityRef)) return { outcome: "denied", rationaleCodes: ["grant_missing"] };
     if (request.executionEnvironmentRef === "live" && !this.#liveEffectsEnabled) return { outcome: "denied", rationaleCodes: ["live_route_not_activated"] };
-    if (request.approvalRequired && !request.approvalRef) return { outcome: "approval_required", rationaleCodes: ["runtime_approval_required"] };
-    if (capability.approval === "always" && !request.approvalRef) return { outcome: "approval_required", rationaleCodes: ["runtime_approval_required"] };
     if (!request.parameters || Array.isArray(request.parameters) || Object.keys(request.parameters).length !== 1 || !Number.isFinite(request.parameters.level) || request.parameters.level < 0 || request.parameters.level > 1) return { outcome: "denied", rationaleCodes: ["invalid_parameters"] };
     if (typeof request.targetEntityId !== "string" || request.targetEntityId.length < 1 || request.targetEntityId.length > 128) return { outcome: "denied", rationaleCodes: ["invalid_target"] };
+    if ((request.approvalRequired || capability.approval === 'always') && !request.approvalRef) return { outcome: 'approval_required', rationaleCodes: ['runtime_approval_required'] };
     return { outcome: "allowed", rationaleCodes: ["explicit_grant_active"], capabilityRef: capability.capabilityRef, effectClass: capability.effectClass };
+  }
+
+  async requestGatewayApproval(request, { assertCurrent, capabilitySnapshot }) {
+    request = structuredClone(request); capabilitySnapshot = structuredClone(capabilitySnapshot);
+    assertCurrent(); verifySnapshot(capabilitySnapshot, request);
+    if (!this.#approvalService || !request.gatewayScope || this.preview(request).outcome !== 'approval_required') return null;
+    return this.#approvalService.requestGateway({ request, snapshot: capabilitySnapshot, assertCurrent });
   }
 
   async authorizeDispatch(request, { assertCurrent = () => {}, capabilitySnapshot = null } = {}) {
@@ -145,7 +151,7 @@ export class ActionService {
     if (typeof request.idempotencyKey !== "string" || request.idempotencyKey.length < 1 || request.idempotencyKey.length > 128) return { decision: { outcome: "denied", rationaleCodes: ["idempotency_required"] }, action: null };
     const grant = this.#grants.get(request.principalRef);
     const grantRevision = grant?.revision ?? 0;
-    if (request.approvalRequired && (!this.#approvalService || !(await this.#approvalService.verify({ approvalRef: request.approvalRef, request })))) return { decision: { outcome: "denied", rationaleCodes: ["approval_invalid_or_expired"] }, action: null };
+    if ((request.approvalRequired || capabilityFor(request)?.approval === 'always') && (!this.#approvalService || !(await this.#approvalService.verify({ approvalRef: request.approvalRef, request, capabilitySnapshot })))) return { decision: { outcome: "denied", rationaleCodes: ["approval_invalid_or_expired"] }, action: null };
     if (this.#grants.get(request.principalRef)?.revision !== grantRevision) return { decision: { outcome: "denied", rationaleCodes: ["grant_changed_during_authorization"] }, action: null };
     assertCurrent();
     const fingerprint = actionFingerprint(request);
@@ -178,7 +184,7 @@ export class ActionService {
         grantRevision,
         targetIdentity: this.#targetIdentity,
         deadlineAt: new Date(Math.min(request.deadline ? Date.parse(request.deadline) : Infinity, this.#clock().valueOf() + 30_000)).toISOString(),
-        approvalRequired: Boolean(request.approvalRequired),
+        approvalRequired: Boolean(request.approvalRequired || capabilityFor(request)?.approval === 'always'),
         approvalRef: request.approvalRef ?? null,
         gatewayScope: request.gatewayScope ?? null,
         capabilitySnapshot,
@@ -254,7 +260,7 @@ export class ActionService {
     if (!claimed.result.claimed) return action;
     let targetResult;
     // Approval may expire or be withdrawn while admission is being persisted.
-    const approvalValid = !action.approvalRequired || (this.#approvalService && await this.#approvalService.verify({ approvalRef: action.approvalRef, request: action }));
+    const approvalValid = !action.approvalRequired || (this.#approvalService && await this.#approvalService.verify({ approvalRef: action.approvalRef, request: action, capabilitySnapshot: action.capabilitySnapshot }));
     const restriction = this.#dispatchRestriction(action, assertCurrent, assertSnapshot);
     if (restriction || !approvalValid) {
       targetResult = { status: "denied", externalEffectOccurred: false, reasonCode: restriction ?? "approval_invalid_or_expired" };

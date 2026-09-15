@@ -110,9 +110,9 @@ export function isAllowedStudioOrigin(origin, host) {
 export function createStudioSessionRegistry() {
   const sessions = new Map();
   return {
-    issue({ principalRef = "principal.studio", siteRefs = ["home.one"], ttlMs = 3_600_000 } = {}) {
+    issue({ principalRef = "principal.studio", siteRefs = ["home.one"], ttlMs = 3_600_000, authenticationMethod = 'administration_token' } = {}) {
       const sessionRef = randomBytes(32).toString("base64url");
-      const context = { principalRef, siteRefs: [...new Set(siteRefs)], expiresAt: new Date(Date.now() + ttlMs).toISOString() };
+      const context = { principalRef, siteRefs: [...new Set(siteRefs)], expiresAt: new Date(Date.now() + ttlMs).toISOString(), authenticationMethod, authenticatedAt: new Date().toISOString() };
       sessions.set(sessionRef, context);
       return { sessionRef, ...context };
     },

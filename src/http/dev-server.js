@@ -95,11 +95,13 @@ export async function createStudioHttpServer({ env = process.env, store, service
             ? await studioAuth.authenticateRecovery({ code: payload.recoveryCode })
             : await studioAuth.authenticate({ username: payload.username, password: payload.password });
           if (!identity) return json(res, 401, errorPayload("studio_authentication_failed", "authentication_failed"));
-          const session = sessions.issue({ principalRef: identity.principalRef, siteRefs: effectiveService.siteRefs });
+          const session = sessions.issue({ principalRef: identity.principalRef, siteRefs: effectiveService.siteRefs, authenticationMethod: identity.transport });
           res.writeHead(200, { ...SECURITY_HEADERS, "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "set-cookie": [`pwce_studio_session=${encodeURIComponent(session.sessionRef)}; HttpOnly; SameSite=Strict; Path=/`] });
           return res.end(JSON.stringify({ authenticated: true, transport: identity.transport, expiresAt: session.expiresAt }));
         }
         if (req.method === "GET" && url.pathname === "/api/session") {
+          const current = sessions.get(parseCookies(req.headers.cookie).pwce_studio_session);
+          if (current) return json(res, 200, { authenticated: true, transport: 'local_session', authenticationMethod: current.authenticationMethod, expiresAt: current.expiresAt });
           const { session, transport } = issueStudioSession({ authorization: req.headers.authorization, configuredToken: configuredStudioToken, sessions, siteRefs: effectiveService.siteRefs, requiresHumanAuth: await studioAuth.hasAccount() });
           res.writeHead(200, { ...SECURITY_HEADERS, "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "set-cookie": [`pwce_studio_session=${encodeURIComponent(session.sessionRef)}; HttpOnly; SameSite=Strict; Path=/`] });
           return res.end(JSON.stringify({ authenticated: true, transport, expiresAt: session.expiresAt }));
@@ -118,6 +120,11 @@ export async function createStudioHttpServer({ env = process.env, store, service
         const jsonPost = req.method === "POST" && (url.pathname === "/api/agent/message" || url.pathname === "/api/actions/preview" || url.pathname === "/api/actions/dispatch" || url.pathname === "/api/approvals" || url.pathname.endsWith("/approve"));
         if (jsonPost) requireJsonContentType(req);
         const requireSite = (siteRef) => { if (!studioContext.siteRefs.includes(siteRef)) { const error = new Error("site is outside Studio authority"); error.code = "scope_denied"; error.statusCode = 403; throw error; } };
+        const requireCurrentReview = siteRef => {
+          const fresh = getStudioContext({ authorization: req.headers.authorization, cookie: cookies.pwce_studio_session, configuredToken: configuredStudioToken, sessions, siteRefs: effectiveService.siteRefs });
+          if (!fresh || fresh.principalRef !== studioContext.principalRef || (siteRef && !fresh.siteRefs.includes(siteRef))) throw Object.assign(new Error('Sign in again'), { code: 'authentication_required', statusCode: 401 });
+          return fresh;
+        };
         if (req.method === "GET" && url.pathname === "/api/health") return json(res, 200, { ...(await getHealth(effectiveStore)), runtime: effectiveService.runtimeStatus() });
         if (req.method === "GET" && url.pathname === "/api/sites") {
           return json(res, 200, { sites: await listAuthorizedSites({ store: effectiveStore, siteRefs: studioContext.siteRefs }) });
@@ -137,10 +144,37 @@ export async function createStudioHttpServer({ env = process.env, store, service
           requireSite(request.siteRef);
           return json(res, 201, await effectiveService.approvalService.request({ request, requestedBy: "principal.studio" }));
         }
+        if (req.method === 'GET' && url.pathname === '/api/approvals') {
+          if ([...url.searchParams.keys()].some(key => !['siteRef','limit','cursor'].includes(key) || url.searchParams.getAll(key).length !== 1)) return json(res, 422, errorPayload('Invalid approval query', 'invalid_request'));
+          const siteRef = url.searchParams.get('siteRef'); if (siteRef) requireSite(siteRef);
+          const result = await effectiveService.approvalService.listGateway({ siteRefs: siteRef ? [siteRef] : studioContext.siteRefs, limit: url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : 20, after: url.searchParams.get('cursor') });
+          requireCurrentReview(siteRef);
+          return json(res, 200, result);
+        }
         const approvalMatch = url.pathname.match(/^\/api\/approvals\/([^/]+)\/approve$/);
-        if (req.method === "POST" && approvalMatch) { const state = await effectiveStore.load(); const approval = state.approvals[approvalMatch[1]]; if (!approval) return json(res, 404, errorPayload("approval_not_found", "not_found")); if (approval.siteRef) requireSite(approval.siteRef); return json(res, 200, await effectiveService.approvalService.approve({ approvalRef: approvalMatch[1], approvedBy: "human.local" })); }
+        if (req.method === 'POST' && approvalMatch) {
+          const state = await effectiveStore.load(), approval = state.approvals[approvalMatch[1]];
+          if (!approval) return json(res, 404, errorPayload('approval_not_found', 'not_found')); if (approval.siteRef) requireSite(approval.siteRef);
+          if (!approval.gatewayReview) return json(res, 200, await effectiveService.approvalService.approve({ approvalRef: approvalMatch[1], approvedBy: studioContext.principalRef }));
+          const body = await readJsonObjectBody(req);
+          if (Object.keys(body).some(key => key !== 'confirmationDigest') || typeof body.confirmationDigest !== 'string') return json(res, 422, errorPayload('Review the current request first', 'invalid_request'));
+          const assertCurrent = () => {
+            const fresh = getStudioContext({ authorization: req.headers.authorization, cookie: cookies.pwce_studio_session, configuredToken: configuredStudioToken, sessions, siteRefs: effectiveService.siteRefs });
+            if (!fresh || fresh.principalRef !== studioContext.principalRef || fresh.authenticatedAt !== studioContext.authenticatedAt ||
+              !['password','recovery_code'].includes(fresh.authenticationMethod) || !fresh.siteRefs.includes(approval.siteRef)) throw Object.assign(new Error('Sign in with your password or recovery code to approve Assistant requests'), { code: 'human_authentication_required', statusCode: 403 });
+            gatewayBinding.gateway.assertApprovalSnapshot(approval.gatewaySnapshot);
+          };
+          assertCurrent();
+          return json(res, 200, await effectiveService.approvalService.approve({ approvalRef: approvalMatch[1], approvedBy: studioContext.principalRef,
+            confirmationDigest: body.confirmationDigest, humanProof: { principalRef: studioContext.principalRef, authenticationMethod: studioContext.authenticationMethod, authenticatedAt: studioContext.authenticatedAt, verifiedAt: new Date().toISOString() }, assertCurrent }));
+        }
         const approvalStatusMatch = url.pathname.match(/^\/api\/approvals\/([^/]+)$/);
-        if (req.method === "GET" && approvalStatusMatch) { const approval = await effectiveService.approvalService.get({ approvalRef: approvalStatusMatch[1] }); if (!approval) return json(res, 404, errorPayload("approval_not_found", "not_found")); if (approval.siteRef) requireSite(approval.siteRef); return json(res, 200, approval); }
+        if (req.method === 'GET' && approvalStatusMatch) {
+          const state = await effectiveStore.load(), stored = state.approvals[approvalStatusMatch[1]];
+          if (!stored) return json(res, 404, errorPayload('approval_not_found', 'not_found')); if (stored.siteRef) requireSite(stored.siteRef);
+          const approval = await effectiveService.approvalService.get({ approvalRef: approvalStatusMatch[1] }); requireCurrentReview(stored.siteRef);
+          return json(res, 200, approval);
+        }
         if (req.method === "POST" && url.pathname === "/api/actions/dispatch") {
           if (!effectiveService.actionService) return json(res, 503, errorPayload("home_assistant_not_configured", "configuration_unavailable"));
           const request = requestFromPayload(await readJsonObjectBody(req), effectiveService);

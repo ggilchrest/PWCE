@@ -32,3 +32,7 @@ Use a readable operations hierarchy: runtime summary first, evidence second, con
 - Inputs have labels and buttons have explicit names.
 - Focus indicators are visible.
 - Text and status colors are paired with words, not color alone.
+
+## Assistant request review
+
+The bounded review panel uses the existing navy surfaces with a blue `#a6d2ff` action/focus accent and `#446689` section border. Records have named fields, complete wrapped identifiers and a distinct status. Five records per page keep the page manageable. Each record opens its own scope details and places confirmation and approval directly below them; dispatch is never offered inside the Human review panel. Pending, approved, expired, loading, empty and unknown-submission states use explicit text. Site changes and sign-out clear loaded records, and stale asynchronous replies cannot repopulate them. Touch targets are at least 44px and detail fields stack below 600px.

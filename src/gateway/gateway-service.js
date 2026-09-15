@@ -333,6 +333,15 @@ export class GatewayService {
     return { source: JSON.parse(json), digest: sourceDigest };
   }
 
+  /** Trusted Studio review checks custody; this is not a Gateway wire operation. */
+  assertApprovalSnapshot(binding) {
+    const record = this.#capabilitySnapshots.get(binding?.snapshotRef);
+    if (!record || record.sha256 !== binding.sha256) throw fail('snapshot_unavailable', 'original approval snapshot is unavailable');
+    const scope = JSON.parse(record.scope), context = this.#contexts.get(scope[0]), principal = context && this.#principals.get(context.principalRef);
+    if (!context || !principal || context.principalRevision !== principal.revision || context.grantRevision !== (this.#actionService?.getGrant(context.principalRef).revision ?? null)) throw fail('authority_context_invalidated', 'approval authority has changed');
+    this.#assertSnapshot(record, context, { worldRef: scope[9], executionEnvironmentRef: scope[10] });
+  }
+
   #assertSnapshot(record, context, input) {
     const now = this.#clock().valueOf();
     if (!Number.isFinite(now) || now < Date.parse(record.value.issuedAt) || now >= Date.parse(record.value.expiresAt)) throw fail('snapshot_expired', 'capability snapshot is no longer current');
@@ -413,9 +422,16 @@ export class GatewayService {
     const current = () => { assertCurrent(); this.#assertSnapshot(snapshot, context, input); };
     const request = this.#actionRequest(context, input);
     request.capabilityVersion ??= capability.schemaVersion;
-    const admitted = await this.#actionService.authorizeDispatch(request, { assertCurrent: current,
-      capabilitySnapshot: { snapshotRef: snapshot.value.snapshotRef, sha256: snapshot.sha256, expiresAt: snapshot.value.expiresAt, snapshotJson: snapshot.snapshotJson } });
-    if (!admitted.action) return { status: "denied", ...admitted.decision };
+    const capabilitySnapshot = { snapshotRef: snapshot.value.snapshotRef, sha256: snapshot.sha256, expiresAt: snapshot.value.expiresAt, snapshotJson: snapshot.snapshotJson };
+    const admitted = await this.#actionService.authorizeDispatch(request, { assertCurrent: current, capabilitySnapshot });
+    if (!admitted.action) {
+      if (admitted.decision.outcome === 'approval_required' && !request.approvalRef) {
+        const approval = await this.#actionService.requestGatewayApproval(request, { assertCurrent: current, capabilitySnapshot });
+        current();
+        if (approval) return { status: 'approval_required', ...admitted.decision, approvalRef: approval.approvalRef, approval };
+      }
+      return { status: 'denied', ...admitted.decision };
+    }
     // Repeating a transport command reads its original disposition. It never
     // acquires a new permission to start an earlier admitted action.
     const action = admitted.duplicate ? admitted.action : await this.#actionService.dispatch(admitted.action.actionRef, { assertCurrent: current,
