@@ -1,3 +1,4 @@
+import {admissionRecoveryContracts} from '../gateway/admission-recovery-contracts.js';
 import { admissionContracts, admissionSchema } from '../actions/admission-contracts.js';
 import { admissionEvidence } from '../actions/admission-evidence.js';
 import { invocationContracts, invocationSchema } from '../actions/invocation-contracts.js';
@@ -70,6 +71,21 @@ export function createGatewayHttpBinding({ store, token, dispatcherToken = null,
       if (!pathname.startsWith("/gateway/v1/")) return false;
       if (!token) { json(res, 503, gatewayError("gateway_token_not_configured")); return true; }
       const presentedToken = bearer(req);
+      if (pathname === '/gateway/v1/admission-recovery' || pathname === '/gateway/v1/admission-recovery/bundle') {
+        if (!sameSecret(presentedToken,token)) { json(res,401,gatewayError('authentication_failed'));return true; }
+        if (pathname.endsWith('/bundle')) { json(res,req.method==='GET'?200:405,req.method==='GET'?admissionRecoveryContracts:gatewayError('method_not_allowed'));return true; }
+        if (req.method !== 'POST') { json(res,405,gatewayError('method_not_allowed'));return true; }
+        if (req.headers['x-pwce-admission-recovery-contract'] !== admissionRecoveryContracts.bundleDigest) { json(res,409,gatewayError('incompatible_admission_recovery_contract'));return true; }
+        try {
+          requireJsonContentType(req);
+          const payload = await readJsonObjectBody(req, admissionRecoveryContracts.maximumRequestBytes);
+          if (Object.hasOwn(payload,'token')) throw Object.assign(new Error('credentials belong in the Authorization header'),{code:'invalid_request'});
+          const result = await gateway.recoverAdmissionAuthenticated({...payload,token:presentedToken});
+          if (Buffer.byteLength(JSON.stringify(result)) > admissionRecoveryContracts.maximumResponseBytes) throw Object.assign(new Error('admission recovery response exceeds its published limit'),{code:'limit_exceeded'});
+          json(res,200,result);
+        } catch(error) { json(res,authError(error),gatewayError(error.code??'gateway_request_failed',error.message)); }
+        return true;
+      }
       if (pathname === '/gateway/v1/capability-contracts' || pathname.startsWith('/gateway/v1/capability-contracts/')) {
         if (!sameSecret(presentedToken, token)) { json(res, 401, gatewayError('authentication_failed')); return true; }
         if (req.method !== 'GET') { json(res, 405, gatewayError('method_not_allowed')); return true; }

@@ -1,3 +1,5 @@
+import {admissionEvidence} from '../actions/admission-evidence.js';
+import {validateAdmissionRecoveryRequest} from './admission-recovery-validation.js';
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { assertRef } from "../domain/identity.js";
 import { explainCurrent, queryAsOf, queryHistory } from "../domain/query-service.js";
@@ -136,6 +138,14 @@ export class GatewayService {
     return this.request(request);
   }
 
+  async recoverAdmissionAuthenticated({token,...input}) {
+    const request = validateAdmissionRecoveryRequest(input);
+    this.authenticateAuthorityContext({token,authorityContextRef:request.authorityContextRef});
+    const remaining = Date.parse(request.deadline) - this.#clock().valueOf();
+    if (!Number.isFinite(remaining) || remaining <= 0 || remaining > 30000) throw fail('deadline_exceeded', 'admission recovery requires a current bounded read deadline');
+    return this.#request(request, false, true);
+  }
+
   async request(request) {
     return this.#request(request);
   }
@@ -149,7 +159,7 @@ export class GatewayService {
     return this.#request(request, true);
   }
 
-  async #request({ profileId = PROFILE_ID, profileVersion = PROFILE_VERSION, operation, authorityContextRef, requestId, correlationId, worldRef, executionEnvironmentRef = "normal", deadline, assistantRef, endpointRef, participantRefs, audienceRef, ...input }, trustedDispatch = false) {
+  async #request({ profileId = PROFILE_ID, profileVersion = PROFILE_VERSION, operation, authorityContextRef, requestId, correlationId, worldRef, executionEnvironmentRef = "normal", deadline, assistantRef, endpointRef, participantRefs, audienceRef, ...input }, trustedDispatch = false, admissionRecovery = false) {
     input = structuredClone(input);
     participantRefs = structuredClone(participantRefs);
     await this.#eventReady;
@@ -178,6 +188,12 @@ export class GatewayService {
     const metadata = { profileId: PROFILE_ID, profileVersion: PROFILE_VERSION, ...requestContext };
     await this.#audit("gateway.request", { principalRef: context.principalRef, operation, siteRef: input.siteRef ?? null, ...requestContext });
     assertCurrent();
+    if (operation === 'authority.recoverAdmission') {
+      if (!admissionRecovery) throw fail('unsupported_operation', 'admission recovery requires its separately negotiated transport');
+      const result = await this.#recoverAdmission(context, {...input,...requestContext}, assertCurrent);
+      assertCurrent();
+      return {...metadata,recoveryProfileId:'pwce-admission-recovery.v1',recoveryProfileVersion:'1.0.0',...result};
+    }
     if (operation === "health.get") return { ...metadata, ...(await getHealth(this.#store, { now: this.#clock })) };
     if (operation === "context.getPreparedInputs") return this.#boundedPreparedResponse(input, { ...metadata, ...(await this.#preparedInputs(context, input)) });
     if (operation === "context.query") return this.#boundedQueryResponse(input, { ...metadata, ...(await this.#query(context, input)) });
@@ -484,6 +500,22 @@ export class GatewayService {
     current();
     const result = action.result ?? action;
     return { status: action.status === "succeeded" ? "completed" : action.status, actionRef: admitted.action.actionRef, decision: admitted.decision, result };
+  }
+
+  async #recoverAdmission(context, input, assertCurrent) {
+    const unknown = reason => ({status:'unknown',actionRef:null,admissionEvidence:null,reason});
+    if (!this.#actionService) return unknown('admission_not_found');
+    const action = await this.#actionService.findAdmission(input.idempotencyKey);
+    assertCurrent();
+    if (!action || action.principalRef !== context.principalRef || !context.siteRefs.includes(action.siteRef) || action.executionEnvironmentRef !== input.executionEnvironmentRef) return unknown('admission_not_found');
+    const scope = action.gatewayScope;
+    if (!scope || scope.worldRef !== input.worldRef || scope.assistantRef !== context.assistantRef || scope.endpointRef !== context.endpointRef || scope.audienceRef !== context.audienceRef || !Array.isArray(scope.participantRefs) || !sameIdentityList(scope.participantRefs,context.participantRefs)) return unknown('admission_not_found');
+    if (action.requestFingerprint !== input.requestFingerprint || action.approvalRequired !== input.approvalRequired || action.approvalRef !== input.approvalRef || action.capabilitySnapshot?.snapshotRef !== input.originalSnapshotRef) return unknown('admission_not_found');
+    if (action.targetIdentity == null) return unknown('original_evidence_unavailable');
+    const proof = admissionEvidence(action);
+    if (JSON.parse(proof.capabilitySnapshot.snapshotJson).scope[0] !== context.authorityContextRef) return unknown('admission_not_found');
+    assertCurrent();
+    return {status:'known',actionRef:proof.actionRef,admissionEvidence:proof,reason:null};
   }
 
   async #getInvocation(context, { actionRef, executionEnvironmentRef, deadline } = {}, assertCurrent = () => {}) {

@@ -1,0 +1,75 @@
+{
+  "profileId": "pwce-admission-recovery.v1",
+  "profileVersion": "1.0.0",
+  "bundleId": "pwce-admission-recovery.bundle.v1",
+  "bundleVersion": "1.0.0",
+  "requiredGatewayBundle": {
+    "bundleId": "pwce-agent-gateway.bundle.v1",
+    "bundleVersion": "1.0.0",
+    "bundleDigest": "32c555ba675b61b4c1ec82245e314a8f6ca537484defbeb48b9fe1b6bdf4e2e2"
+  },
+  "requiredAdmissionBundle": {
+    "bundleId": "pwce-action-admission.bundle.v1",
+    "bundleVersion": "1.0.0",
+    "bundleDigest": "0379a7615ee3df928024d8f0290bbcf62b5ccb67e016ef3c3373d37a87294f8f"
+  },
+  "requestSchemaRef": "https://pwce.local/contracts/pwce-admission-recovery-request-1.0.0.schema.json",
+  "responseSchemaRef": "https://pwce.local/contracts/pwce-admission-recovery-response-1.0.0.schema.json",
+  "routes": {
+    "bundle": {
+      "method": "GET",
+      "path": "/gateway/v1/admission-recovery/bundle"
+    },
+    "query": {
+      "method": "POST",
+      "path": "/gateway/v1/admission-recovery"
+    }
+  },
+  "authentication": {
+    "agentBearerRequired": true,
+    "dispatcherSecretRequired": false,
+    "contractHeader": "X-PWCE-Admission-Recovery-Contract"
+  },
+  "maximumRequestBytes": 65536,
+  "maximumResponseBytes": 131072,
+  "semantics": {
+    "lookup": "Read the original globally unique producer idempotency key. The caller supplies its exact original canonical requestFingerprint text, snapshot and approval terms. A changed or absent tuple returns unknown without an action identifier. The original producer deadline comes only from retained admission evidence; it is not replaced by the query deadline.",
+    "scope": "Current Agent authentication and the original authority context must match principal, sites, World, environment, Assistant, endpoint, ordered participants and audience. Expired or revoked current authority withholds evidence. Context rotation and restoration are not supplied by this profile.",
+    "immutability": "The returned admissionEvidence is the existing public admission proof projected from original durable custody. Its original action ID, admittedAt, deadlineAt, snapshot, precondition and approval terms are not renewed. Current invocation status and effect confirmation require a separate status read.",
+    "readOnly": "Never call authorization, dispatch, target preconditions, target invocation or target reconciliation. Gateway request audit may be appended; no action, approval or snapshot is created or changed.",
+    "uncertainty": "Unknown never proves that no admission occurred and never authorizes resubmission. Legacy records lacking qualified original evidence remain unavailable. Corrupt qualified evidence fails closed.",
+    "deadline": "The query has a new current deadline at most 30000 ms away, independent of the original admission deadline. Original expiry does not hide historical evidence or create fresh dispatch authority."
+  },
+  "digestAlgorithm": "sha256-ordered-path-bytes-v1",
+  "bundleDigest": "43d1d8e574bf09a92bf1cd24ac69ffbb6a2e6a56c7628ae8dfe35d18854a5ab3",
+  "artifacts": [
+    {
+      "path": "contracts/admission-recovery/profile.json",
+      "sha256": "d0efa349ec7cc2c876cdee67fcad837811a2d3e95132676a3724290ad663f9c6"
+    },
+    {
+      "path": "contracts/admission-recovery/request.schema.json",
+      "sha256": "9cd50d512bb461f6238d5790c716c2ed5c10aeb3e6ca40798bf4d26b659678b2"
+    },
+    {
+      "path": "contracts/admission-recovery/response.schema.json",
+      "sha256": "fb513d5fc385652427f8477cb312c0cb354ddb240b05fafd0d5efdc69f8e0c26"
+    }
+  ],
+  "schemaArtifacts": [
+    {
+      "reference": "https://pwce.local/contracts/pwce-admission-recovery-request-1.0.0.schema.json",
+      "sha256": "9cd50d512bb461f6238d5790c716c2ed5c10aeb3e6ca40798bf4d26b659678b2",
+      "byteLength": 3035,
+      "mediaType": "application/schema+json",
+      "schemaRef": "https://json-schema.org/draft/2020-12/schema"
+    },
+    {
+      "reference": "https://pwce.local/contracts/pwce-admission-recovery-response-1.0.0.schema.json",
+      "sha256": "fb513d5fc385652427f8477cb312c0cb354ddb240b05fafd0d5efdc69f8e0c26",
+      "byteLength": 19307,
+      "mediaType": "application/schema+json",
+      "schemaRef": "https://json-schema.org/draft/2020-12/schema"
+    }
+  ]
+}

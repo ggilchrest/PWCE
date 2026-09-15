@@ -117,6 +117,15 @@ export class ActionService {
     return verifyReconciliations(state.actions[actionRef]) ?? null;
   }
 
+  /** Read original custody only; no preview, target check or effect retry. */
+  async findAdmission(idempotencyKey) {
+    if (typeof idempotencyKey !== 'string' || idempotencyKey.length < 1 || idempotencyKey.length > 128) throw recoveryError('invalid_request');
+    const state = await this.#store.load();
+    const matches = Object.values(state.actions).filter(action => action.idempotencyKey === idempotencyKey);
+    if (matches.length > 1) throw recoveryError('admission_evidence_invalid');
+    return matches.length ? structuredClone(matches[0]) : null;
+  }
+
   getGrant(principalRef) {
     const grant = this.#grants.get(principalRef);
     return grant ? { revision: grant.revision, siteRefs: [...grant.siteRefs], capabilityRefs: [...grant.capabilityRefs] } : { revision: 0, siteRefs: [], capabilityRefs: [] };
