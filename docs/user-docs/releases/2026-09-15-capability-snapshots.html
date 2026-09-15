@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Keep actions tied to current capability lists — PWCE</title><link rel="stylesheet" href="../assets/docs.css"></head>
+<body><header class="doc-header"><a href="index.html">PWCE release notes</a><span class="doc-meta">2026-09-15 · Development Batch 169</span></header><main>
+<h1>Keep actions tied to current capability lists</h1><h2>What changed</h2><p>The Gateway now retains the capability list used for an action and checks it again before dispatch. Old, foreign or invalidated lists cannot be silently replaced. Repeating an interrupted request reads its earlier disposition without restarting its action.</p>
+<h2>Why it matters</h2><p>A reviewed list cannot quietly change meaning while an action waits to start.</p>
+<h2>What to test</h2><ul><li><a href="../qa/inspect-local-context.html#capability-snapshots">Inspect local context QA</a> — focus on stable references, scope changes, admission interruptions, preserved evidence and the synthetic HTTP check.</li></ul>
+<h2>Where to read more</h2><p><a href="../manual/inspect-local-context.html#capability-snapshots">Keep an action tied to the reviewed capability list</a>.</p>
+<h2>Screenshots updated</h2><p>No screen layout changed. Existing screenshots remain applicable.</p>
+<h2>Known issues / follow-ups</h2><p><a href="../../../PV1-T5-CHECKLIST.md">Full Assistant integration</a>, physical target preconditions and Gateway-scoped approval remain in progress. The saved services and live-effect settings were not changed.</p>
+</main><footer class="doc-footer">PWCE release notes · 2026-09-15</footer></body></html>

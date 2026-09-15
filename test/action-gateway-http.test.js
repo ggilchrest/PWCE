@@ -23,7 +23,11 @@ test('real HTTP action boundary preserves preview, version, duplicate and scoped
   const identity = { assistantRef: 'assistant.synthetic', audienceRef: 'audience.synthetic' };
   const authority = await post('/authority', { siteRefs: ['home.one'], ...identity });
   assert.equal(authority.status, 201);
-  const request = { authorityContextRef: authority.body.authorityContextRef, ...identity, worldRef: 'world.personal.v1', executionEnvironmentRef: 'test', siteRef: 'home.one', capabilityRef: 'home.light.set_level', capabilityVersion: '1.0.0', capabilityOperation: 'light.set_level', targetEntityId: 'light.synthetic', parameters: { level: 0.5 }, approvalRequired: false, idempotencyKey: 'synthetic-http-action' };
+  const snapshot = await post('/request', { authorityContextRef: authority.body.authorityContextRef, ...identity, executionEnvironmentRef: 'test', operation: 'capabilities.getSnapshot' });
+  assert.equal(snapshot.status, 200);
+  const request = { authorityContextRef: authority.body.authorityContextRef, ...identity, worldRef: 'world.personal.v1', executionEnvironmentRef: 'test', snapshotRef: snapshot.body.snapshotRef, siteRef: 'home.one', capabilityRef: 'home.light.set_level', capabilityVersion: '1.0.0', capabilityOperation: 'light.set_level', targetEntityId: 'light.synthetic', parameters: { level: 0.5 }, approvalRequired: false, idempotencyKey: 'synthetic-http-action' };
+  const missingSnapshot = await post('/request', { ...request, operation: 'capabilities.invoke', snapshotRef: '00000000-0000-4000-8000-000000000001' });
+  assert.equal(missingSnapshot.body.error.code, 'snapshot_unavailable'); assert.equal(calls, 0);
   const preview = await post('/request', { ...request, operation: 'authority.evaluate' });
   assert.equal(preview.body.outcome, 'allowed');
   assert.equal(calls, 0);

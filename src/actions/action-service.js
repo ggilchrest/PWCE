@@ -10,11 +10,26 @@ const needsReconciliation = action => action.status === 'started' ||
   ['outcome_unknown','timed_out','cancelled','partially_succeeded'].includes(action.status) && action.result?.externalEffectOccurred !== false;
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 function verifyReconciliations(action) {
+  if (action?.snapshotRequired && action.capabilitySnapshot == null) throw recoveryError('snapshot_evidence_corrupt');
+  if (action?.capabilitySnapshot != null) verifySnapshot(action.capabilitySnapshot, action);
   for (const { sha256, ...entry } of action?.reconciliations ?? []) {
     if (sha256 !== digest(entry) || entry.actionRef !== action.actionRef || entry.attemptRef !== action.attemptRef ||
       entry.requestFingerprint !== action.requestFingerprint || entry.targetIdentity !== action.targetIdentity) throw recoveryError('reconciliation_evidence_corrupt');
   }
   return action;
+}
+function verifySnapshot(binding, action) {
+  try {
+    if (Object.keys(binding).sort().join(',') !== 'expiresAt,sha256,snapshotJson,snapshotRef' ||
+      typeof binding.snapshotJson !== 'string' || Buffer.byteLength(binding.snapshotJson) > 32768 ||
+      createHash('sha256').update(binding.snapshotJson).digest('hex') !== binding.sha256) throw new Error();
+    const record = JSON.parse(binding.snapshotJson), snapshot = record.snapshot;
+    if (binding.snapshotRef !== snapshot.snapshotRef || binding.expiresAt !== snapshot.expiresAt || !Number.isFinite(Date.parse(binding.expiresAt)) ||
+      !Array.isArray(record.scope) || record.scope.length !== 11 || !/^[0-9a-f]{64}$/.test(record.sourceDigest)) throw new Error();
+    if (action && (snapshot.principalRef !== action.principalRef || !snapshot.siteRefs.includes(action.siteRef) ||
+      record.scope[9] !== action.gatewayScope?.worldRef || record.scope[10] !== action.executionEnvironmentRef ||
+      JSON.stringify(record.scope.slice(5, 9)) !== JSON.stringify([action.gatewayScope?.assistantRef, action.gatewayScope?.endpointRef, action.gatewayScope?.participantRefs, action.gatewayScope?.audienceRef]))) throw new Error();
+  } catch { throw recoveryError('snapshot_evidence_corrupt'); }
 }
 function normalizeTargetResult(result) {
   // Target feedback must be bounded, lossless JSON. Never persist provider-owned
@@ -77,7 +92,8 @@ export class ActionService {
   }
 
   snapshot() {
-    return { version: "1.0.0", capabilities: capabilitySnapshot() };
+    const capabilities = capabilitySnapshot();
+    return { version: "1.0.0", capabilities, bindingRef: digest({ capabilities, targetIdentity: this.#targetIdentity, liveEffectsEnabled: this.#liveEffectsEnabled }) };
   }
 
   registerGrant({ principalRef, siteRefs, capabilityRefs }) {
@@ -118,8 +134,11 @@ export class ActionService {
     return { outcome: "allowed", rationaleCodes: ["explicit_grant_active"], capabilityRef: capability.capabilityRef, effectClass: capability.effectClass };
   }
 
-  async authorizeDispatch(request, { assertCurrent = () => {} } = {}) {
+  async authorizeDispatch(request, { assertCurrent = () => {}, capabilitySnapshot = null } = {}) {
     request = structuredClone(request);
+    // Snapshot custody is supplied by the trusted Gateway, never request JSON.
+    capabilitySnapshot = structuredClone(capabilitySnapshot);
+    if (capabilitySnapshot !== null) verifySnapshot(capabilitySnapshot, request);
     assertCurrent();
     const decision = this.preview(request);
     if (decision.outcome !== "allowed") return { decision, action: null };
@@ -136,6 +155,7 @@ export class ActionService {
       if (this.#grants.get(request.principalRef)?.revision !== grantRevision) return { action: null, decision: { outcome: "denied", rationaleCodes: ["grant_changed_during_authorization"] } };
       const existing = Object.values(state.actions).find((action) => action.idempotencyKey === request.idempotencyKey);
       if (existing) {
+        verifyReconciliations(existing);
         if (existing.requestFingerprint !== fingerprint) {
           const error = new Error("idempotency key conflicts with a different action");
           error.code = "idempotency_conflict";
@@ -161,6 +181,8 @@ export class ActionService {
         approvalRequired: Boolean(request.approvalRequired),
         approvalRef: request.approvalRef ?? null,
         gatewayScope: request.gatewayScope ?? null,
+        capabilitySnapshot,
+        snapshotRequired: capabilitySnapshot !== null,
         status: "admitted",
         decision: { outcome: decision.outcome, rationaleCodes: decision.rationaleCodes },
         createdAt: this.#clock().toISOString(),
@@ -173,11 +195,11 @@ export class ActionService {
     return { decision, ...result.result };
   }
 
-  async dispatch(actionRef, { assertCurrent = () => {} } = {}) {
+  async dispatch(actionRef, { assertCurrent = () => {}, assertSnapshot } = {}) {
     assertCurrent();
     const inFlight = this.#inFlight.get(actionRef);
     if (inFlight) return inFlight;
-    const operation = this.#dispatch(actionRef, assertCurrent);
+    const operation = this.#dispatch(actionRef, assertCurrent, assertSnapshot);
     this.#inFlight.set(actionRef, operation);
     try {
       return await operation;
@@ -186,8 +208,12 @@ export class ActionService {
     }
   }
 
-  #dispatchRestriction(action, assertCurrent) {
+  #dispatchRestriction(action, assertCurrent, assertSnapshot) {
     try { assertCurrent(); } catch { return "authority_changed_before_dispatch"; }
+    if (action.capabilitySnapshot !== null && action.capabilitySnapshot !== undefined) {
+      if (typeof assertSnapshot !== 'function') return 'snapshot_binding_unavailable';
+      try { assertSnapshot(structuredClone(action.capabilitySnapshot)); } catch { return 'snapshot_changed_before_dispatch'; }
+    }
     if (action.targetIdentity && action.targetIdentity !== this.#targetIdentity) return "target_changed_before_dispatch";
     const grant = this.#grants.get(action.principalRef);
     const capability = capabilityFor(action);
@@ -197,7 +223,7 @@ export class ActionService {
     return null;
   }
 
-  async #dispatch(actionRef, assertCurrent) {
+  async #dispatch(actionRef, assertCurrent, assertSnapshot) {
     // Persist the attempted boundary before calling the target. A second owner
     // or restored process sees uncertainty, never permission to try again.
     const claimed = await this.#store.transaction((state) => {
@@ -211,7 +237,7 @@ export class ActionService {
         state.audit.push({ type: "action.result", actionRef, status: action.status, recordedAt: action.result.completedAt });
         return { action, claimed: false };
       }
-      const restriction = this.#dispatchRestriction(action, assertCurrent);
+      const restriction = this.#dispatchRestriction(action, assertCurrent, assertSnapshot);
       if (restriction) {
         action.status = "denied";
         action.result = { status: "denied", externalEffectOccurred: false, reasonCode: restriction, completedAt: this.#clock().toISOString() };
@@ -229,7 +255,7 @@ export class ActionService {
     let targetResult;
     // Approval may expire or be withdrawn while admission is being persisted.
     const approvalValid = !action.approvalRequired || (this.#approvalService && await this.#approvalService.verify({ approvalRef: action.approvalRef, request: action }));
-    const restriction = this.#dispatchRestriction(action, assertCurrent);
+    const restriction = this.#dispatchRestriction(action, assertCurrent, assertSnapshot);
     if (restriction || !approvalValid) {
       targetResult = { status: "denied", externalEffectOccurred: false, reasonCode: restriction ?? "approval_invalid_or_expired" };
     } else {

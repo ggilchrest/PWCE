@@ -81,13 +81,19 @@ export class GatewayService {
   #eventReady;
   #eventPersistenceQueue = Promise.resolve();
   #worldRef;
+  #capabilitySnapshots = new Map();
+  #snapshotRetention;
+  #invalidatedSnapshots = new Set();
+  #snapshotSourceDigest = null;
 
-  constructor({ store, actionService = null, clock = () => new Date(), eventRetention = 500 }) {
+  constructor({ store, actionService = null, clock = () => new Date(), eventRetention = 500, snapshotRetention = 256 }) {
     this.#store = store;
     this.#actionService = actionService;
     this.#actionService?.setGrantChangeListener?.((change) => this.#onGrantChanged(change));
     if (!Number.isInteger(eventRetention) || eventRetention < 1 || eventRetention > 10_000) throw fail("invalid_request", "event retention outside allowed range");
     this.#eventRetention = eventRetention;
+    if (!Number.isInteger(snapshotRetention) || snapshotRetention < 1 || snapshotRetention > 1024) throw fail('invalid_request', 'snapshot retention outside allowed range');
+    this.#snapshotRetention = snapshotRetention;
     this.#clock = clock;
     this.#eventReady = this.#restoreEvents();
     this.#unsubscribe = store.subscribe?.((state, result, previousState) => this.#observeState(state, result, previousState)) ?? null;
@@ -166,7 +172,7 @@ export class GatewayService {
     if (operation === "events.subscribe") return { ...metadata, ...(await this.#subscribeEvents(context, input)) };
     if (operation === "trace.publish") return { ...metadata, ...(await this.#publishTrace(context, { ...input, ...requestContext })) };
     if (operation === "authority.authorizeDispatch") throw fail("trusted_dispatch_only", "authority.authorizeDispatch is restricted to the trusted dispatch path");
-    if (operation === "capabilities.getSnapshot") return { ...metadata, ...this.#capabilitySnapshot(context) };
+    if (operation === "capabilities.getSnapshot") return { ...metadata, ...this.#capabilitySnapshot(context, requestContext, input.snapshotRef).value };
     if (operation === "capabilities.invoke") return { ...metadata, ...(await this.#invokeCapability(context, { ...input, ...requestContext, deadline }, assertCurrent)) };
     if (operation === "capabilities.getInvocation") return { ...metadata, ...(await this.#getInvocation(context, { ...input, ...requestContext, deadline }, assertCurrent)) };
     throw fail("unsupported_operation", `unsupported gateway operation: ${operation}`);
@@ -309,11 +315,52 @@ export class GatewayService {
     return { profileId: PROFILE_ID, profileVersion: PROFILE_VERSION, principalRef: context.principalRef, siteRefs, capabilityRefs, sourceRevision: materialSourceRevision(state), limitations: capabilityRefs.length ? [] : ["No effect capability grant is activated in the current gateway tier."] };
   }
 
-  #capabilitySnapshot(context) {
-    const snapshot = this.#actionService?.snapshot();
-    const issuedAt = this.#clock().toISOString();
-    const grantRevision = context.grantRevision ?? 0;
-    return { snapshotRef: randomUUID(), profileId: PROFILE_ID, profileVersion: PROFILE_VERSION, principalRef: context.principalRef, siteRefs: [...context.siteRefs], sourceRevision: grantRevision, issuedAt, expiresAt: context.expiresAt, invalidationSequence: grantRevision, capabilities: snapshot?.capabilities ?? [], availability: snapshot ? "configured" : "none", limitations: snapshot ? [] : ["No effect capability is activated in the current development tier."] };
+  #snapshotScope(context, input) {
+    return JSON.stringify([context.authorityContextRef, context.principalRef, context.principalRevision, context.grantRevision,
+      context.siteRefs, context.assistantRef, context.endpointRef, context.participantRefs, context.audienceRef, input.worldRef, input.executionEnvironmentRef]);
+  }
+
+  #snapshotSource() {
+    const source = this.#actionService?.snapshot() ?? null;
+    const json = JSON.stringify(source);
+    if (Buffer.byteLength(json) > 16_384) throw fail('limit_exceeded', 'capability catalog exceeds snapshot limit');
+    const sourceDigest = digest(json).toString('hex');
+    if (this.#snapshotSourceDigest !== null && this.#snapshotSourceDigest !== sourceDigest) {
+      for (const reference of this.#capabilitySnapshots.keys()) this.#invalidatedSnapshots.add(reference);
+      this.#publishEvent({ type: 'capabilities.invalidated', siteRef: null, reason: 'capability_source_changed', sourceRevision: sourceDigest });
+    }
+    this.#snapshotSourceDigest = sourceDigest;
+    return { source: JSON.parse(json), digest: sourceDigest };
+  }
+
+  #assertSnapshot(record, context, input) {
+    const now = this.#clock().valueOf();
+    if (!Number.isFinite(now) || now < Date.parse(record.value.issuedAt) || now >= Date.parse(record.value.expiresAt)) throw fail('snapshot_expired', 'capability snapshot is no longer current');
+    if (this.#capabilitySnapshots.get(record.value.snapshotRef) !== record || record.scope !== this.#snapshotScope(context, input)) throw fail('snapshot_unavailable', 'capability snapshot is unavailable in this scope');
+    if (record.sourceDigest !== this.#snapshotSource().digest || this.#invalidatedSnapshots.has(record.value.snapshotRef) || input.worldRef !== this.#worldRef) throw fail('snapshot_stale', 'capability source changed; read a fresh snapshot');
+  }
+
+  #capabilitySnapshot(context, input, reference) {
+    const now = this.#clock().valueOf();
+    if (!Number.isFinite(now)) throw fail('snapshot_unavailable', 'trusted snapshot time is unavailable');
+    const scope = this.#snapshotScope(context, input);
+    if (reference !== undefined) {
+      if (typeof reference !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(reference)) throw fail('invalid_request', 'snapshotRef must be a canonical UUID');
+      const record = this.#capabilitySnapshots.get(reference);
+      if (!record || record.scope !== scope) throw fail('snapshot_unavailable', 'capability snapshot is unavailable in this scope');
+      this.#assertSnapshot(record, context, input); return record;
+    }
+    const current = this.#snapshotSource();
+    for (const [key, record] of this.#capabilitySnapshots) {
+      if (Date.parse(record.value.expiresAt) <= now) { this.#capabilitySnapshots.delete(key); this.#invalidatedSnapshots.delete(key); }
+      else if (!this.#invalidatedSnapshots.has(key) && record.scope === scope && record.sourceDigest === current.digest) { this.#assertSnapshot(record, context, input); return record; }
+    }
+    if (this.#capabilitySnapshots.size >= this.#snapshotRetention) throw fail('limit_exceeded', 'capability snapshot retention is full');
+    const value = { snapshotRef: randomUUID(), profileId: PROFILE_ID, profileVersion: PROFILE_VERSION, principalRef: context.principalRef, siteRefs: [...context.siteRefs], sourceRevision: context.grantRevision ?? 0, issuedAt: new Date(now).toISOString(), expiresAt: context.expiresAt, invalidationSequence: context.grantRevision ?? 0, capabilities: current.source?.capabilities ?? [], availability: current.source ? 'configured' : 'none', limitations: current.source ? [] : ['No effect capability is activated in the current development tier.'] };
+    const snapshotJson = JSON.stringify({ scope: JSON.parse(scope), sourceDigest: current.digest, snapshot: value });
+    if (Buffer.byteLength(snapshotJson) > 32768) throw fail('limit_exceeded', 'retained capability snapshot exceeds byte limit');
+    const record = deepFreeze({ scope, sourceDigest: current.digest, snapshotJson, sha256: digest(snapshotJson).toString('hex'), value });
+    this.#capabilitySnapshots.set(value.snapshotRef, record); this.#assertSnapshot(record, context, input); return record;
   }
 
   #actionRequest(context, input) {
@@ -359,11 +406,21 @@ export class GatewayService {
   async #invokeCapability(context, input = {}, assertCurrent = () => {}) {
     if (!this.#actionService) return { status: "denied", outcome: "denied", rationaleCodes: ["effect_capabilities_not_activated"] };
     if (!input.idempotencyKey) throw fail("invalid_request", "capabilities.invoke requires idempotencyKey");
+    const snapshot = this.#capabilitySnapshot(context, input, input.snapshotRef);
+    const capability = snapshot.value.capabilities.find(item => item.capabilityRef === input.capabilityRef);
+    if (!capability) return { status: 'denied', outcome: 'denied', rationaleCodes: ['capability_not_available'] };
+    if (input.capabilityVersion !== undefined && input.capabilityVersion !== capability.schemaVersion) return { status: 'denied', outcome: 'denied', rationaleCodes: ['capability_version_mismatch'] };
+    const current = () => { assertCurrent(); this.#assertSnapshot(snapshot, context, input); };
     const request = this.#actionRequest(context, input);
-    const admitted = await this.#actionService.authorizeDispatch(request, { assertCurrent });
+    request.capabilityVersion ??= capability.schemaVersion;
+    const admitted = await this.#actionService.authorizeDispatch(request, { assertCurrent: current,
+      capabilitySnapshot: { snapshotRef: snapshot.value.snapshotRef, sha256: snapshot.sha256, expiresAt: snapshot.value.expiresAt, snapshotJson: snapshot.snapshotJson } });
     if (!admitted.action) return { status: "denied", ...admitted.decision };
-    const action = await this.#actionService.dispatch(admitted.action.actionRef, { assertCurrent });
-    assertCurrent();
+    // Repeating a transport command reads its original disposition. It never
+    // acquires a new permission to start an earlier admitted action.
+    const action = admitted.duplicate ? admitted.action : await this.#actionService.dispatch(admitted.action.actionRef, { assertCurrent: current,
+      assertSnapshot: binding => { if (binding.snapshotRef !== snapshot.value.snapshotRef || binding.sha256 !== snapshot.sha256) throw fail('snapshot_unavailable', 'original snapshot binding is unavailable'); current(); } });
+    current();
     const result = action.result ?? action;
     return { status: action.status === "succeeded" ? "completed" : action.status, actionRef: admitted.action.actionRef, decision: admitted.decision, result };
   }
@@ -382,6 +439,7 @@ export class GatewayService {
   }
 
   #observeState(state, result, previousState) {
+    if (this.#worldRef !== undefined && this.#worldRef !== state.worldRef) for (const reference of this.#capabilitySnapshots.keys()) this.#invalidatedSnapshots.add(reference);
     this.#worldRef = state.worldRef;
     for (const listener of this.#eventListeners) listener.check();
     const observation = result?.observation?.recordId ? state.observations.find((candidate) => candidate.recordId === result.observation.recordId) : null;
@@ -459,6 +517,8 @@ export class GatewayService {
   }
 
   close() {
+    this.#capabilitySnapshots.clear();
+    this.#invalidatedSnapshots.clear();
     this.#unsubscribe?.();
     this.#unsubscribe = null;
     for (const listener of this.#eventListeners) listener.close("provider_closed");

@@ -6,6 +6,7 @@ This checklist records the exact current Lifestream integration boundary without
 
 | Check | Result | Evidence |
 |---|---|---|
+| Retained capability snapshots, admission/dispatch guards and original snapshot custody | `componentPass` | `DEVELOPMENT-BATCH-169.md`; 209 producer tests, including 13 new snapshot cases and authenticated HTTP selection. Physical target preconditions, Gateway-scoped approval and full Lifestream canonical mapping remain open. |
 | Original-target action reconciliation and authenticated status recovery | `componentPass` | `DEVELOPMENT-BATCH-168.md`; six baseline failures repaired, 196 producer tests, preserved result history and actual synthetic HTTP recovery. Canonical Lifestream action mapping remains open. |
 | Producer action admission, durable attempt and scoped outcome boundaries | `componentPass` | `DEVELOPMENT-BATCH-167.md`; six corrected baseline failures, 176 producer tests and 26 existing Lifestream separate-process checks. Complete action mapping remains open. |
 | Scoped event transport, current authority lifetime and complete replay handoff | `componentPass` | `DEVELOPMENT-BATCH-165.md`; 156 producer tests and 15 Lifestream separate-process HTTP checks. Runtime cache and async provider composition remain open. |
