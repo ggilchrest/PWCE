@@ -1,6 +1,8 @@
 import { timingSafeEqual } from "node:crypto";
 import { GatewayService, gatewayProfile } from "../gateway/gateway-service.js";
 import { gatewayBundle } from "../gateway/gateway-bundle.js";
+import { dispatchBundle } from "../gateway/dispatch-bundle.js";
+import { validateDispatchRequest } from "./dispatch-contract.js";
 import { validateAuthorityRequest } from "./gateway-contract.js";
 import { MAX_TRANSPORT_BYTES, readJsonBody, readJsonObjectBody, requireJsonContentType } from "./json-body.js";
 import { SECURITY_HEADERS } from "./security-headers.js";
@@ -54,7 +56,9 @@ function sse(res, result) {
   return writeEvent;
 }
 
-export function createGatewayHttpBinding({ store, token, principalRef = "agent.fixture", siteRefs = ["home.one"], actionService = null, gateway = new GatewayService({ store, actionService }) } = {}) {
+export function createGatewayHttpBinding({ store, token, dispatcherToken = null, principalRef = "agent.fixture", siteRefs = ["home.one"], actionService = null, gateway = null } = {}) {
+  if (dispatcherToken !== null && (typeof dispatcherToken !== 'string' || !/^[\x21-\x7e]{32,512}$/.test(dispatcherToken) || !token || sameSecret(dispatcherToken, token))) throw new Error('trusted dispatcher requires a distinct host secret and configured Agent authentication');
+  gateway ??= new GatewayService({ store, actionService });
   if (token) gateway.registerPrincipal({ principalRef, token, siteRefs });
   return {
     gateway,
@@ -62,6 +66,23 @@ export function createGatewayHttpBinding({ store, token, principalRef = "agent.f
       if (!pathname.startsWith("/gateway/v1/")) return false;
       if (!token) { json(res, 503, gatewayError("gateway_token_not_configured")); return true; }
       const presentedToken = bearer(req);
+      if (pathname === '/gateway/v1/dispatch' || pathname === '/gateway/v1/dispatch/bundle') {
+        if (!dispatcherToken) { json(res, 503, gatewayError('trusted_dispatch_not_configured')); return true; }
+        if (!sameSecret(presentedToken, token) || !sameSecret(req.headers['x-pwce-dispatcher-token'], dispatcherToken)) { json(res, 401, gatewayError('authentication_failed')); return true; }
+        if (req.headers.origin !== undefined) { json(res, 403, gatewayError('trusted_dispatch_browser_forbidden')); return true; }
+        if (pathname.endsWith('/bundle')) {
+          json(res, req.method === 'GET' ? 200 : 405, req.method === 'GET' ? dispatchBundle : gatewayError('method_not_allowed')); return true;
+        }
+        if (req.method !== 'POST') { json(res, 405, gatewayError('method_not_allowed')); return true; }
+        if (req.headers['x-pwce-dispatch-contract'] !== dispatchBundle.bundleDigest) { json(res, 409, gatewayError('incompatible_dispatch_contract')); return true; }
+        try {
+          requireJsonContentType(req);
+          const request = validateDispatchRequest(await readJsonObjectBody(req));
+          const result = await gateway.requestTrustedDispatch({ ...request, token: presentedToken });
+          json(res, 200, { ...result, dispatchProfileId: dispatchBundle.dispatchProfileId, dispatchProfileVersion: dispatchBundle.dispatchProfileVersion });
+        } catch (error) { json(res, authError(error), gatewayError(error.code ?? 'gateway_request_failed', error.message)); }
+        return true;
+      }
       if (req.method === "GET" && pathname === "/gateway/v1/profile") {
         if (!sameSecret(presentedToken, token)) { json(res, 401, gatewayError("authentication_failed", "authentication failed")); return true; }
         return json(res, 200, gatewayProfile), true;

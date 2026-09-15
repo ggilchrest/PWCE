@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pwce.local/contracts/pwce-trusted-dispatch-response-1.0.0.schema.json",
+  "title": "Producer dispatch response; admission evidence is not effect confirmation",
+  "type": "object",
+  "required": [
+    "dispatchProfileId",
+    "dispatchProfileVersion",
+    "profileId",
+    "profileVersion",
+    "requestId",
+    "correlationId",
+    "worldRef",
+    "executionEnvironmentRef",
+    "status"
+  ],
+  "properties": {
+    "dispatchProfileId": {
+      "const": "pwce-trusted-dispatch.v1"
+    },
+    "dispatchProfileVersion": {
+      "const": "1.0.0"
+    },
+    "profileId": {
+      "const": "pwce-agent-gateway.v1"
+    },
+    "profileVersion": {
+      "const": "1.0.0"
+    },
+    "requestId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "correlationId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "worldRef": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "executionEnvironmentRef": {
+      "enum": [
+        "normal",
+        "live",
+        "test",
+        "replay",
+        "simulation",
+        "dry-run"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "actionRef": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "decision": {
+      "type": "object"
+    },
+    "duplicate": {
+      "type": "boolean"
+    },
+    "admission": {
+      "type": "object",
+      "required": [
+        "actionRef",
+        "idempotencyKey",
+        "requestFingerprint",
+        "principalRef",
+        "capabilityRef",
+        "capabilityVersion",
+        "operation",
+        "siteRef",
+        "targetEntityId",
+        "parameters",
+        "executionEnvironmentRef",
+        "grantRevision",
+        "targetIdentity",
+        "deadlineAt",
+        "approvalRequired",
+        "approvalRef",
+        "gatewayScope",
+        "capabilitySnapshot",
+        "status",
+        "decision",
+        "createdAt",
+        "result"
+      ],
+      "properties": {
+        "actionRef": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "idempotencyKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "requestFingerprint": {
+          "type": "string"
+        },
+        "parameters": {
+          "type": "object"
+        },
+        "capabilitySnapshot": {
+          "type": "object",
+          "required": [
+            "snapshotRef",
+            "sha256",
+            "expiresAt",
+            "snapshotJson"
+          ]
+        },
+        "gatewayScope": {
+          "type": "object"
+        },
+        "result": {
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "result": {
+      "type": "object"
+    },
+    "outcome": {
+      "type": "string"
+    },
+    "rationaleCodes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      }
+    },
+    "approvalRef": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "approval": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": true
+}

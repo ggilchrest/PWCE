@@ -1,0 +1,29 @@
+// Generated from the public trusted-dispatch contract.
+const freeze = value => { if (value && typeof value === 'object') { for (const child of Object.values(value)) freeze(child); Object.freeze(value); } return value; };
+export const dispatchBundle = freeze({
+  "bundleId": "pwce-trusted-dispatch.bundle.v1",
+  "bundleVersion": "1.0.0",
+  "dispatchProfileId": "pwce-trusted-dispatch.v1",
+  "dispatchProfileVersion": "1.0.0",
+  "requiredGatewayBundle": {
+    "bundleId": "pwce-agent-gateway.bundle.v1",
+    "bundleVersion": "1.0.0",
+    "bundleDigest": "32c555ba675b61b4c1ec82245e314a8f6ca537484defbeb48b9fe1b6bdf4e2e2"
+  },
+  "digestAlgorithm": "sha256-ordered-path-bytes-v1",
+  "bundleDigest": "c61b022af86244d9da5f6b1e2222b44df22487289c0a963816f5242e0958e7be",
+  "artifacts": [
+    {
+      "path": "contracts/gateway-dispatch/transport.json",
+      "sha256": "89b51459b788f49cfbea04b43121f216c477c79e0248dae525a664e305095bbe"
+    },
+    {
+      "path": "contracts/gateway-dispatch/request.schema.json",
+      "sha256": "a727b6cb9f1db9252075d32ce4e3826f036a700c4bc7d6742d9a92eeba25443e"
+    },
+    {
+      "path": "contracts/gateway-dispatch/response.schema.json",
+      "sha256": "0ba4d439853235e9638a4d405383c3753f52af12182b00c282a60997b3b13b62"
+    }
+  ]
+});

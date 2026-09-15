@@ -1,0 +1,31 @@
+{
+  "dispatchProfileId": "pwce-trusted-dispatch.v1",
+  "dispatchProfileVersion": "1.0.0",
+  "bundleId": "pwce-trusted-dispatch.bundle.v1",
+  "bundleVersion": "1.0.0",
+  "requiredGatewayBundle": {
+    "bundleId": "pwce-agent-gateway.bundle.v1",
+    "bundleVersion": "1.0.0",
+    "bundleDigest": "32c555ba675b61b4c1ec82245e314a8f6ca537484defbeb48b9fe1b6bdf4e2e2"
+  },
+  "bundlePath": "/gateway/v1/dispatch/bundle",
+  "requestPath": "/gateway/v1/dispatch",
+  "agentCredentialHeader": "Authorization",
+  "dispatcherCredentialHeader": "X-PWCE-Dispatcher-Token",
+  "contractDigestHeader": "X-PWCE-Dispatch-Contract",
+  "maximumTransportBytes": 1048576,
+  "browserOriginAllowed": false,
+  "operations": [
+    "authority.authorizeDispatch",
+    "capabilities.invoke"
+  ],
+  "semantics": {
+    "admission": "Commit the exact producer admission without sending a target command. Return original stored admission on duplicate.",
+    "invocation": "Require original actionRef, snapshotRef, input, scope, approval and idempotency key. Never create a new admission. Claim the original attempt durably before target I/O.",
+    "uncertainOutcome": "Retain original identity and uncertainty. Status reads may reconcile but cannot dispatch.",
+    "authority": "Dispatcher credential does not replace scoped Agent authentication, producer grant, Human approval or target checks.",
+    "recovery": "A replacement process or snapshot does not restore permission to dispatch an old admission.",
+    "credentials": "Host-configured dispatcher secret is distinct from Agent and Studio credentials. Never expose it to a browser or model. Both transport credentials are required.",
+    "errors": "Non-success HTTP responses use the existing Gateway error object with bounded error code and message; they do not certify whether a previously submitted action occurred."
+  }
+}

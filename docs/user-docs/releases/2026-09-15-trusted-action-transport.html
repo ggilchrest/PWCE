@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Separate action permission from execution — PWCE</title><link rel="stylesheet" href="../assets/docs.css"></head>
+<body><header class="doc-header"><a href="index.html">PWCE release notes</a><span class="doc-meta">2026-09-15 · Development Batch 173</span></header><main>
+<h1>Separate action permission from execution</h1><p>A trusted integration can check and record permission before it sends the exact approved action.</p>
+<h2>What changed</h2><p>A separate host connection requires both the Assistant's scoped credential and a distinct dispatcher credential. Its first call records permission without sending a command. Its second call must match that original action. Repeated calls cannot send it twice; an uncertain reply remains uncertain.</p>
+<h2>Why it matters</h2><p>An integration can preserve the difference between approval, permission and execution while keeping PWCE in charge of the action.</p>
+<h2>What to test</h2><ul><li><a href="../qa/inspect-local-context.html">Inspect local context and request a safe action</a> — run the new synthetic admission and HTTP checks, including missing credentials, changed access and duplicate commands.</li></ul>
+<h2>Where to read more</h2><ul><li><a href="../manual/inspect-local-context.html">Inspect local context and request a safe action</a> — separate permission from sending a command.</li></ul>
+<h2>Screenshots updated</h2><p>None. Studio controls and layouts did not change.</p>
+<h2>Known issues / follow-ups</h2><p>The complete configured Lifestream action workflow remains in progress. These checks use synthetic targets and do not establish physical effects or Human acceptance. No saved deployment was reconfigured or restarted.</p>
+</main><footer class="doc-footer">PWCE release notes · 2026-09-15</footer></body></html>

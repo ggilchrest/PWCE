@@ -77,7 +77,9 @@ export async function createStudioHttpServer({ env = process.env, store, service
   const configuredStudioToken = env.PWCE_STUDIO_TOKEN ?? null;
   const gatewayPrincipalRef = env.PWCE_GATEWAY_PRINCIPAL_REF ?? "agent.fixture";
   const gatewaySiteRefs = (env.PWCE_GATEWAY_SITE_REFS ?? effectiveService.siteRefs.join(",")).split(",").filter(Boolean);
-  const gatewayBinding = createGatewayHttpBinding({ store: effectiveStore, token: env.PWCE_GATEWAY_TOKEN ?? null, principalRef: gatewayPrincipalRef, siteRefs: gatewaySiteRefs, actionService: effectiveService.actionService });
+  const dispatcherToken = env.PWCE_GATEWAY_DISPATCHER_TOKEN ?? null;
+  if (dispatcherToken !== null && [configuredStudioToken, configuredPassword, ...(configuredRecoveryCodes ?? [])].includes(dispatcherToken)) throw new Error('trusted dispatcher credential must be distinct from Studio credentials');
+  const gatewayBinding = createGatewayHttpBinding({ dispatcherToken, store: effectiveStore, token: env.PWCE_GATEWAY_TOKEN ?? null, principalRef: gatewayPrincipalRef, siteRefs: gatewaySiteRefs, actionService: effectiveService.actionService });
   if (effectiveService.actionService) {
     effectiveService.actionService.registerGrant({ principalRef: "principal.studio", siteRefs: [effectiveService.siteRef], capabilityRefs: ["home.light.set_level"] });
     if (env.PWCE_GATEWAY_TOKEN) effectiveService.actionService.registerGrant({ principalRef: gatewayPrincipalRef, siteRefs: [effectiveService.siteRef], capabilityRefs: ["home.light.set_level"] });
