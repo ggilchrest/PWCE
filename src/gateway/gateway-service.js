@@ -3,6 +3,7 @@ import { assertRef } from "../domain/identity.js";
 import { explainCurrent, queryAsOf, queryHistory } from "../domain/query-service.js";
 import { qualifyProjection } from "../domain/observation-service.js";
 import { getHealth } from "../runtime/health.js";
+import { actionFingerprint } from "../actions/approval-service.js";
 
 const PROFILE_ID = "pwce-agent-gateway.v1";
 const PROFILE_VERSION = "1.0.0";
@@ -134,7 +135,20 @@ export class GatewayService {
     return this.request(request);
   }
 
-  async request({ profileId = PROFILE_ID, profileVersion = PROFILE_VERSION, operation, authorityContextRef, requestId, correlationId, worldRef, executionEnvironmentRef = "normal", deadline, assistantRef, endpointRef, participantRefs, audienceRef, ...input }) {
+  async request(request) {
+    return this.#request(request);
+  }
+
+  /** Host-only entry point. Never route request JSON to this method. Possession
+   * of an Agent bearer token does not confer trusted-dispatch transport access.
+   * Both phases still authenticate and recheck the original scoped context. */
+  async requestTrustedDispatch({ token, ...request }) {
+    if (!["authority.authorizeDispatch", "capabilities.invoke"].includes(request.operation)) throw fail("unsupported_operation", "trusted dispatch supports admission and original invocation only");
+    this.authenticateAuthorityContext({ token, authorityContextRef: request.authorityContextRef });
+    return this.#request(request, true);
+  }
+
+  async #request({ profileId = PROFILE_ID, profileVersion = PROFILE_VERSION, operation, authorityContextRef, requestId, correlationId, worldRef, executionEnvironmentRef = "normal", deadline, assistantRef, endpointRef, participantRefs, audienceRef, ...input }, trustedDispatch = false) {
     input = structuredClone(input);
     participantRefs = structuredClone(participantRefs);
     await this.#eventReady;
@@ -171,9 +185,12 @@ export class GatewayService {
     if (operation === "authority.evaluate") return { ...metadata, ...(await this.#evaluate(context, { ...input, ...requestContext })) };
     if (operation === "events.subscribe") return { ...metadata, ...(await this.#subscribeEvents(context, input)) };
     if (operation === "trace.publish") return { ...metadata, ...(await this.#publishTrace(context, { ...input, ...requestContext })) };
-    if (operation === "authority.authorizeDispatch") throw fail("trusted_dispatch_only", "authority.authorizeDispatch is restricted to the trusted dispatch path");
+    if (operation === "authority.authorizeDispatch") {
+      if (!trustedDispatch) throw fail("trusted_dispatch_only", "authority.authorizeDispatch is restricted to the trusted dispatch path");
+      return { ...metadata, ...(await this.#invokeCapability(context, { ...input, ...requestContext, deadline }, assertCurrent, 'admit')) };
+    }
     if (operation === "capabilities.getSnapshot") return { ...metadata, ...this.#capabilitySnapshot(context, requestContext, input.snapshotRef).value };
-    if (operation === "capabilities.invoke") return { ...metadata, ...(await this.#invokeCapability(context, { ...input, ...requestContext, deadline }, assertCurrent)) };
+    if (operation === "capabilities.invoke") return { ...metadata, ...(await this.#invokeCapability(context, { ...input, ...requestContext, deadline }, assertCurrent, trustedDispatch ? 'dispatch' : 'combined')) };
     if (operation === "capabilities.getInvocation") return { ...metadata, ...(await this.#getInvocation(context, { ...input, ...requestContext, deadline }, assertCurrent)) };
     throw fail("unsupported_operation", `unsupported gateway operation: ${operation}`);
   }
@@ -412,9 +429,10 @@ export class GatewayService {
     };
   }
 
-  async #invokeCapability(context, input = {}, assertCurrent = () => {}) {
+  async #invokeCapability(context, input = {}, assertCurrent = () => {}, phase = 'combined') {
     if (!this.#actionService) return { status: "denied", outcome: "denied", rationaleCodes: ["effect_capabilities_not_activated"] };
     if (!input.idempotencyKey) throw fail("invalid_request", "capabilities.invoke requires idempotencyKey");
+    if (phase !== 'combined' && !input.snapshotRef) throw fail('invalid_request', 'trusted dispatch requires an explicit retained snapshotRef');
     const snapshot = this.#capabilitySnapshot(context, input, input.snapshotRef);
     const capability = snapshot.value.capabilities.find(item => item.capabilityRef === input.capabilityRef);
     if (!capability) return { status: 'denied', outcome: 'denied', rationaleCodes: ['capability_not_available'] };
@@ -423,6 +441,27 @@ export class GatewayService {
     const request = this.#actionRequest(context, input);
     request.capabilityVersion ??= capability.schemaVersion;
     const capabilitySnapshot = { snapshotRef: snapshot.value.snapshotRef, sha256: snapshot.sha256, expiresAt: snapshot.value.expiresAt, snapshotJson: snapshot.snapshotJson };
+    const dispatchOptions = { assertCurrent: current, assertSnapshot: binding => {
+      if (binding.snapshotRef !== snapshot.value.snapshotRef || binding.sha256 !== snapshot.sha256) throw fail('snapshot_unavailable', 'original snapshot binding is unavailable');
+      current();
+    } };
+    if (phase === 'dispatch') {
+      // Resolve an existing admission before any mutation. An action reference
+      // alone is not authority: preserve its exact input, scope, approval and
+      // retained snapshot. This branch never calls authorizeDispatch.
+      if (typeof input.actionRef !== 'string' || !input.actionRef || input.actionRef.length > 128 || !input.snapshotRef) throw fail('invalid_request', 'trusted invocation requires original actionRef and snapshotRef');
+      const original = await this.#actionService.getInvocation(input.actionRef);
+      current();
+      if (!original || original.principalRef !== context.principalRef || !context.siteRefs.includes(original.siteRef) ||
+        original.requestFingerprint !== actionFingerprint(original) || original.requestFingerprint !== actionFingerprint(request) || original.idempotencyKey !== request.idempotencyKey ||
+        original.approvalRef !== (request.approvalRef ?? null) || original.approvalRequired !== Boolean(request.approvalRequired || capability.approval === 'always') ||
+        original.capabilitySnapshot?.snapshotRef !== capabilitySnapshot.snapshotRef || original.capabilitySnapshot?.sha256 !== capabilitySnapshot.sha256) {
+        throw fail('admission_mismatch', 'invocation does not match an original scoped admission');
+      }
+      const action = await this.#actionService.dispatch(original.actionRef, dispatchOptions);
+      current();
+      return { status: action.status === 'succeeded' ? 'completed' : action.status, actionRef: action.actionRef, decision: action.decision, result: action.result ?? action };
+    }
     const admitted = await this.#actionService.authorizeDispatch(request, { assertCurrent: current, capabilitySnapshot });
     if (!admitted.action) {
       if (admitted.decision.outcome === 'approval_required' && !request.approvalRef) {
@@ -432,10 +471,15 @@ export class GatewayService {
       }
       return { status: 'denied', ...admitted.decision };
     }
+    if (phase === 'admit') {
+      current();
+      // The durable producer record is admission evidence, not an effect result.
+      return { status: admitted.action.status, actionRef: admitted.action.actionRef, decision: admitted.action.decision,
+        duplicate: admitted.duplicate === true, admission: structuredClone(admitted.action) };
+    }
     // Repeating a transport command reads its original disposition. It never
     // acquires a new permission to start an earlier admitted action.
-    const action = admitted.duplicate ? admitted.action : await this.#actionService.dispatch(admitted.action.actionRef, { assertCurrent: current,
-      assertSnapshot: binding => { if (binding.snapshotRef !== snapshot.value.snapshotRef || binding.sha256 !== snapshot.sha256) throw fail('snapshot_unavailable', 'original snapshot binding is unavailable'); current(); } });
+    const action = admitted.duplicate ? admitted.action : await this.#actionService.dispatch(admitted.action.actionRef, dispatchOptions);
     current();
     const result = action.result ?? action;
     return { status: action.status === "succeeded" ? "completed" : action.status, actionRef: admitted.action.actionRef, decision: admitted.decision, result };
