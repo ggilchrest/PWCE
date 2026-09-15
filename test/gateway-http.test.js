@@ -11,7 +11,7 @@ function store() {
 async function invoke(binding, { pathname, method = "GET", authorization, payload, contentLength } = {}) {
   let status; let responseHeaders; let value; const chunks = [];
   const parsed = new URL(pathname, "http://127.0.0.1");
-  const req = { method, url: `${parsed.pathname}${parsed.search}`, headers: { authorization, ...(payload ? { "content-type": "application/json" } : {}), ...(contentLength === undefined ? {} : { "content-length": String(contentLength) }) }, async *[Symbol.asyncIterator]() { if (payload) yield JSON.stringify(payload); } };
+  const req = { method, url: `${parsed.pathname}${parsed.search}`, headers: { authorization, ...(payload !== undefined ? { "content-type": "application/json" } : {}), ...(contentLength === undefined ? {} : { "content-length": String(contentLength) }) }, async *[Symbol.asyncIterator]() { if (payload !== undefined) yield JSON.stringify(payload); } };
   const res = { writeHead(code, headers) { status = code; responseHeaders = headers; }, write(text) { chunks.push(text); }, end(text) { value = text ? JSON.parse(text) : chunks.join(""); } };
   await binding.handle(req, res, parsed.pathname);
   return { status, responseHeaders, value };
@@ -181,4 +181,28 @@ test("fixture external Agent fails closed on a catalog digest mismatch", async (
 test("fixture external Agent fails closed when compatibility metadata is incomplete", async () => {
   const agent = new FixtureExternalAgent({ baseUrl: "http://pwce.local", token: "gateway-test-token", fetchImpl: async () => new Response(JSON.stringify({ profileId: "pwce-agent-gateway.v1", profileVersion: "1.0.0", operationCatalogVersion: "0.1.0", operationCatalogDigest: "445cb4e4b9811a26a41c5821c7d68b09f377b69d24d42ec6dcd0acec5d950b65", operationCatalog: [{ operation: "context.query" }, { operation: "authority.getGrants" }, { operation: "health.get" }] }), { status: 200, headers: { "content-type": "application/json" } }) });
   await assert.rejects(() => agent.profile(), { code: "incompatible_gateway_profile" });
+});
+
+
+test("gateway HTTP body cannot replace bearer authentication or reach the service with non-object input", async (t) => {
+  const binding = createGatewayHttpBinding({ store: store(), token: "synthetic-gateway-token", siteRefs: ["home.one"] });
+  t.after(() => binding.gateway.close());
+  const authority = await invoke(binding, { pathname: "/gateway/v1/authority", method: "POST", authorization: "Bearer synthetic-gateway-token", payload: { siteRefs: ["home.one"] } });
+  assert.equal(authority.status, 201);
+  let calls = 0; const original = binding.gateway.requestAuthenticated.bind(binding.gateway);
+  binding.gateway.requestAuthenticated = async (request) => { calls++; return original(request); };
+  for (const authorization of [undefined, "Bearer wrong-token", "Bearer synthetic-gateway-token"]) {
+    const result = await invoke(binding, { pathname: "/gateway/v1/request", method: "POST", authorization, payload: { operation: "health.get", authorityContextRef: authority.value.authorityContextRef, token: "synthetic-gateway-token" } });
+    assert.equal(result.status, 400); assert.equal(result.value.error.code, "invalid_request");
+    assert.doesNotMatch(JSON.stringify(result.value), /synthetic-gateway-token/);
+  }
+  for (const payload of [null, [], "invalid", 7]) {
+    const result = await invoke(binding, { pathname: "/gateway/v1/request", method: "POST", authorization: "Bearer synthetic-gateway-token", payload });
+    assert.equal(result.status, 400); assert.equal(result.value.error.code, "invalid_request");
+  }
+  assert.equal(calls, 0, "invalid input never reaches authenticated gateway operations");
+  const denied = await invoke(binding, { pathname: "/gateway/v1/request", method: "POST", authorization: "Bearer wrong-token", payload: { operation: "health.get", authorityContextRef: authority.value.authorityContextRef } });
+  assert.equal(denied.status, 401);
+  const valid = await invoke(binding, { pathname: "/gateway/v1/request", method: "POST", authorization: "Bearer synthetic-gateway-token", payload: { operation: "health.get", authorityContextRef: authority.value.authorityContextRef } });
+  assert.equal(valid.status, 200); assert.equal(valid.value.profileId, "pwce-agent-gateway.v1");
 });

@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { GatewayService, gatewayProfile } from "../gateway/gateway-service.js";
 import { gatewayBundle } from "../gateway/gateway-bundle.js";
 import { validateAuthorityRequest } from "./gateway-contract.js";
-import { MAX_TRANSPORT_BYTES, readJsonBody, requireJsonContentType } from "./json-body.js";
+import { MAX_TRANSPORT_BYTES, readJsonBody, readJsonObjectBody, requireJsonContentType } from "./json-body.js";
 import { SECURITY_HEADERS } from "./security-headers.js";
 
 function json(res, status, value) {
@@ -97,8 +97,13 @@ export function createGatewayHttpBinding({ store, token, principalRef = "agent.f
           return json(res, 201, gateway.issueAuthorityContext({ principalRef, token: presentedToken, siteRefs: payload.siteRefs, ttlMs: payload.ttlMs, assistantRef: payload.assistantRef, endpointRef: payload.endpointRef, participantRefs: payload.participantRefs, audienceRef: payload.audienceRef })), true;
         }
         if (pathname === "/gateway/v1/request") {
-          const payload = await readJsonBody(req);
-          const result = await gateway.requestAuthenticated({ token: presentedToken, ...payload });
+          const payload = await readJsonObjectBody(req);
+          if (Object.hasOwn(payload, "token")) {
+            const error = new Error("gateway credentials belong in the Authorization header");
+            error.code = "invalid_request";
+            throw error;
+          }
+          const result = await gateway.requestAuthenticated({ ...payload, token: presentedToken });
           return json(res, 200, result), true;
         }
         json(res, 404, gatewayError("gateway_route_not_found"));
