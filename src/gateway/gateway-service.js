@@ -361,7 +361,12 @@ export class GatewayService {
     const sourceDigest = digest(json).toString('hex');
     if (this.#snapshotSourceDigest !== null && this.#snapshotSourceDigest !== sourceDigest) {
       for (const reference of this.#capabilitySnapshots.keys()) this.#invalidatedSnapshots.add(reference);
-      this.#publishEvent({ type: 'capabilities.invalidated', siteRef: null, reason: 'capability_source_changed', sourceRevision: sourceDigest });
+      // A source-wide change still needs an authorized watch selector. A null
+      // selector is filtered out by both live delivery and scoped replay.
+      // One event per principal reaches all its sites/contexts without exposing
+      // another principal's scope or producing duplicates for shared authority.
+      const principals = new Set([...this.#contexts.values()].map(context => context.principalRef));
+      for (const principalRef of principals) this.#publishEvent({ type: 'capabilities.invalidated', principalRef, siteRef: null, reason: 'capability_source_changed', sourceRevision: sourceDigest });
     }
     this.#snapshotSourceDigest = sourceDigest;
     return { source: JSON.parse(json), digest: sourceDigest };

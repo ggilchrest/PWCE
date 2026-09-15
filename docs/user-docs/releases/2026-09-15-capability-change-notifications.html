@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Capability change notifications — PWCE release notes</title><link rel="stylesheet" href="../assets/docs.css"></head>
+<body><header class="doc-header"><a href="index.html">PWCE release notes</a><span class="doc-meta">2026-09-15 · Development Batch 181</span></header><main>
+<h1>Capability change notifications</h1>
+<h2>What changed</h2><p>Connected integrations now receive a notification when PWCE detects that provider settings or capability definitions have changed. Each authorized site connection receives it, and reconnecting can retrieve the same notification from recent history.</p>
+<h2>Why it matters</h2><p>An integration can discard an outdated capability list promptly instead of missing the change.</p>
+<h2>What to test</h2><ul class="test-list"><li><a href="../qa/inspect-local-context.html#capability-change-notifications">QA: Inspect local context</a> — check live delivery, separate principals, replay, restart and revoked access.</li></ul>
+<h2>Where to read more</h2><ul><li><a href="../manual/inspect-local-context.html#capability-change-notifications">Receive changes to a capability list</a> — what the notification means and when a fresh read is required.</li></ul>
+<h2>Screenshots updated</h2><p>None. No Studio screen changed.</p>
+<h2>Known issues / follow-ups</h2><p>The <a href="../../../DEVELOPMENT-BATCH-181.md">development record</a> keeps the remaining Lifestream host integration separate. Saved services and live device settings have not changed.</p>
+</main><footer class="doc-footer">PWCE release notes · 2026-09-15</footer></body></html>
