@@ -4,11 +4,11 @@ import { ActionService } from '../../src/actions/action-service.js';
 import { ApprovalService } from '../../src/actions/approval-service.js';
 import { createStudioHttpServer } from '../../src/http/dev-server.js';
 
-export async function gatewayApprovalFixture() {
+export async function gatewayApprovalFixture({ target = null, liveEffectsEnabled = false, executionEnvironmentRef = 'test' } = {}) {
   const secret = () => randomBytes(24).toString('hex'); let calls = 0, clockOffset = 0;
   const clock = () => new Date(Date.now() + clockOffset), store = new StateStore({ state: emptyState() });
   const approvals = new ApprovalService({ store, clock });
-  const actions = new ActionService({ store, approvalService: approvals, clock, target: { identity: 'synthetic-human-review-target', async invoke() { calls++; return { status: 'succeeded', externalEffectOccurred: true }; } } });
+  const actions = new ActionService({ store, approvalService: approvals, clock, liveEffectsEnabled, target: target ?? { identity: 'synthetic-human-review-target', async invoke() { calls++; return { status: 'succeeded', externalEffectOccurred: true }; } } });
   const password = secret(), recoveryCode = secret(), studioToken = secret(), gatewayToken = secret();
   const env = { PWCE_STUDIO_USERNAME: 'synthetic-reviewer', PWCE_STUDIO_PASSWORD: password, PWCE_STUDIO_RECOVERY_CODES: recoveryCode, PWCE_STUDIO_TOKEN: studioToken, PWCE_GATEWAY_TOKEN: gatewayToken, PWCE_GATEWAY_SITE_REFS: 'home.one,home.two' };
   const service = { siteRef: 'home.one', siteRefs: ['home.one'], entityId: 'light.synthetic', actionService: actions, approvalService: approvals, runtimeStatus: () => ({ status: 'offline', reason: 'synthetic_review_fixture' }), stop() {} };
@@ -23,7 +23,7 @@ export async function gatewayApprovalFixture() {
   };
   const identity = { assistantRef: 'assistant.synthetic', endpointRef: 'endpoint.synthetic', participantRefs: ['participant.synthetic'], audienceRef: 'audience.synthetic' };
   const authority = await send('/gateway/v1/authority', { siteRefs: ['home.one'], ...identity }, 'gateway');
-  const scope = { ...identity, authorityContextRef: authority.body.authorityContextRef, executionEnvironmentRef: 'test' };
+  const scope = { ...identity, authorityContextRef: authority.body.authorityContextRef, executionEnvironmentRef };
   const payload = { ...scope, operation: 'capabilities.invoke', capabilityRef: 'home.light.set_level', capabilityVersion: '1.0.0', capabilityOperation: 'light.set_level', siteRef: 'home.one', targetEntityId: 'light.synthetic', parameters: { level: 0.4 }, approvalRequired: true, idempotencyKey: 'synthetic-reviewed-action' };
   return { base, password, recoveryCode, env, store, actions, approvals, identity, payload, send, calls: () => calls,
     prepare: extra => send('/gateway/v1/request', { ...payload, ...extra }, 'gateway'),

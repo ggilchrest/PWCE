@@ -9,6 +9,11 @@ export class FixtureActionTarget {
     this.#mode = mode;
   }
 
+  async checkPreconditions(action, { signal } = {}) {
+    signal?.throwIfAborted();
+    return { allowed: action.executionEnvironmentRef !== 'live' && action.operation === 'light.set_level', reasonCode: action.executionEnvironmentRef === 'live' ? 'fixture_live_route_forbidden' : 'synthetic_target_available', observed: null };
+  }
+
   async invoke({ operation, siteRef, targetEntityId, parameters }) {
     if (this.#mode === "timeout") return { status: "timed_out", externalEffectOccurred: "unknown", reasonCode: "fixture_timeout" };
     if (this.#mode === "unknown") return { status: "outcome_unknown", externalEffectOccurred: "unknown", reasonCode: "fixture_connection_lost" };

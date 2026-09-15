@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Check light availability before dispatch — PWCE</title><link rel="stylesheet" href="../assets/docs.css"></head>
+<body><header class="doc-header"><a href="index.html">PWCE release notes</a><span class="doc-meta">2026-09-15 · Development Batch 171</span></header><main>
+<h1>Check light availability before dispatch</h1>
+<h2>What changed</h2><p>PWCE now checks the selected Home Assistant light before admitting a new action and again before sending its command. Unavailable or mismatched state prevents dispatch. Repeating an existing request returns its original result.</p>
+<h2>Why it matters</h2><p>A light can become unavailable after you approve it. Approval alone no longer lets that action proceed.</p>
+<h2>What to test</h2><ul><li><a href="../qa/inspect-local-context.html#target-checks">Inspect local context QA</a> — use the safe automated check for unavailable targets, changed access, expiry and retries.</li></ul>
+<h2>Where to read more</h2><p><a href="../manual/inspect-local-context.html#target-checks">Why an approved light action can still be denied</a>.</p>
+<h2>Screenshots updated</h2><p>None. Studio controls and layout are unchanged; the existing captures still show those controls.</p>
+<h2>Known issues / follow-ups</h2><p>A device can change after a read, and a sent command still needs independent confirmation. <a href="../../../PV1-T5-CHECKLIST.md">Complete Lifestream action integration and physical-device acceptance</a> remain open. Validation used simulated Home Assistant responses, without changing saved services or live settings.</p>
+</main><footer class="doc-footer">PWCE release notes · 2026-09-15</footer></body></html>

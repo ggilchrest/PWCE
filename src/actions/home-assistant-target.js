@@ -11,6 +11,25 @@ export class HomeAssistantActionTarget {
       `home-assistant:${createHash('sha256').update(JSON.stringify([config.siteRef, config.sourceRef, config.baseUrl])).digest('hex')}` : null;
   }
 
+  async checkPreconditions(action, { signal } = {}) {
+    signal?.throwIfAborted();
+    const deny = reasonCode => ({ allowed: false, reasonCode, observed: null }), config = this.#adapter.configuration;
+    const currentIdentity = config?.siteRef && config?.sourceRef && config?.baseUrl ? `home-assistant:${createHash('sha256').update(JSON.stringify([config.siteRef, config.sourceRef, config.baseUrl])).digest('hex')}` : null;
+    if (!this.identity || currentIdentity !== this.identity || action.targetIdentity !== this.identity) return deny('target_binding_changed');
+    if (action.siteRef !== config.siteRef) return deny('target_site_mismatch');
+    if (action.executionEnvironmentRef !== 'live') return deny('live_target_requires_live_environment');
+    if (action.operation !== 'light.set_level' || typeof action.targetEntityId !== 'string' || !/^light\.[a-z0-9_]+$/.test(action.targetEntityId)) return deny('target_entity_not_a_light');
+    const state = await this.#adapter.getState(action.targetEntityId, { signal }); signal?.throwIfAborted();
+    const after = this.#adapter.configuration;
+    if (JSON.stringify([after?.siteRef, after?.sourceRef, after?.baseUrl]) !== JSON.stringify([config.siteRef, config.sourceRef, config.baseUrl])) return deny('target_binding_changed');
+    if (!state || state.siteRef !== action.siteRef || state.sourceRef !== config.sourceRef || state.externalEntityId !== action.targetEntityId || state.property !== 'state') return deny('target_state_scope_mismatch');
+    if (!Number.isFinite(Date.parse(state.eventTime)) || Date.parse(state.eventTime) > this.#clock().valueOf()) return deny('target_state_time_invalid');
+    if (!['on','off'].includes(state.value)) return deny('target_state_unavailable');
+    // last_updated may be old for an unchanged light. This is a fresh scoped
+    // GET, not reuse of a cached observation or proof that an effect occurred.
+    return { allowed: true, reasonCode: 'target_state_available', observed: { siteRef: state.siteRef, sourceRef: state.sourceRef, entityId: state.externalEntityId, eventTime: state.eventTime, state: state.value } };
+  }
+
   async invoke(action, { signal } = {}) {
     signal?.throwIfAborted();
     if (action.siteRef !== this.#adapter.configuration?.siteRef) return { status: "rejected", externalEffectOccurred: false, reasonCode: "target_site_mismatch" };

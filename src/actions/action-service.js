@@ -10,6 +10,12 @@ const needsReconciliation = action => action.status === 'started' ||
   ['outcome_unknown','timed_out','cancelled','partially_succeeded'].includes(action.status) && action.result?.externalEffectOccurred !== false;
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 function verifyReconciliations(action) {
+  if (action?.preconditionsRequired && !action.preconditionChecks?.length) throw recoveryError('precondition_evidence_missing');
+  for (const [index, check] of (action?.preconditionChecks ?? []).entries()) {
+    const { sha256, ...entry } = check;
+    if (index > 1 || sha256 !== digest(entry) || entry.phase !== (index === 0 ? 'admission' : 'dispatch') || entry.targetIdentity !== action.targetIdentity || entry.requestFingerprint !== action.requestFingerprint ||
+      !Number.isFinite(Date.parse(entry.checkedAt)) || typeof entry.result?.allowed !== 'boolean' || (index === 0 && !entry.result.allowed)) throw recoveryError('precondition_evidence_corrupt');
+  }
   if (action?.snapshotRequired && action.capabilitySnapshot == null) throw recoveryError('snapshot_evidence_corrupt');
   if (action?.capabilitySnapshot != null) verifySnapshot(action.capabilitySnapshot, action);
   for (const { sha256, ...entry } of action?.reconciliations ?? []) {
@@ -78,10 +84,13 @@ export class ActionService {
   #onGrantChanged;
   #targetIdentity;
   #reconciliationTimeoutMs;
+  #preconditionTimeoutMs;
 
-  constructor({ store, target, approvalService = null, liveEffectsEnabled = false, clock = () => new Date(), onGrantChanged = () => {}, targetIdentity = target?.identity ?? null, reconciliationTimeoutMs = 5000 }) {
+  constructor({ store, target, approvalService = null, liveEffectsEnabled = false, clock = () => new Date(), onGrantChanged = () => {}, targetIdentity = target?.identity ?? null, reconciliationTimeoutMs = 5000, preconditionTimeoutMs = 1000 }) {
     if (targetIdentity !== null && (typeof targetIdentity !== 'string' || targetIdentity.length < 1 || targetIdentity.length > 128)) throw new Error('invalid target identity');
     if (!Number.isInteger(reconciliationTimeoutMs) || reconciliationTimeoutMs < 1 || reconciliationTimeoutMs > 30000) throw new Error('invalid reconciliation timeout');
+    if (!Number.isInteger(preconditionTimeoutMs) || preconditionTimeoutMs < 1 || preconditionTimeoutMs > 5000) throw new Error('invalid precondition timeout');
+    this.#preconditionTimeoutMs = preconditionTimeoutMs;
     this.#targetIdentity = targetIdentity; this.#reconciliationTimeoutMs = reconciliationTimeoutMs;
     this.#store = store;
     this.#target = target;
@@ -140,6 +149,25 @@ export class ActionService {
     return this.#approvalService.requestGateway({ request, snapshot: capabilitySnapshot, assertCurrent });
   }
 
+  async #checkPreconditions(request, phase) {
+    if (typeof this.#target?.checkPreconditions !== 'function' && request.executionEnvironmentRef !== 'live' && !request.preconditionsRequired) return null;
+    const controller = new AbortController(), remaining = Math.min(this.#preconditionTimeoutMs, Date.parse(request.deadline ?? request.deadlineAt ?? new Date(this.#clock().valueOf() + this.#preconditionTimeoutMs).toISOString()) - this.#clock().valueOf());
+    let timer, result = { allowed: false, reasonCode: 'target_preconditions_unavailable', observed: null };
+    const expires = performance.now() + Math.max(0, remaining);
+    try {
+      if (!Number.isFinite(remaining) || remaining <= 0 || typeof this.#target?.checkPreconditions !== 'function') throw new Error();
+      const value = await Promise.race([this.#target.checkPreconditions({ ...structuredClone(request), targetIdentity: this.#targetIdentity }, { signal: controller.signal }), new Promise((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new Error()); }, remaining); })]);
+      // Reuse the bounded lossless-JSON validator without granting a target
+      // permission to author host evidence identity or timestamps.
+      const normalized = normalizeTargetResult({ status: 'denied', externalEffectOccurred: false, observed: value });
+      if (performance.now() >= expires || normalized.reasonCode === 'target_invalid_result' || !value || Object.keys(value).sort().join(',') !== 'allowed,observed,reasonCode' || typeof value.allowed !== 'boolean' || !/^[a-zA-Z0-9_.-]{1,128}$/.test(value.reasonCode) || Buffer.byteLength(JSON.stringify(value)) > 8192) throw new Error();
+      result = structuredClone(value);
+    } catch { /* Unavailable or late preconditions cannot authorize admission. */ }
+    finally { clearTimeout(timer); controller.abort(); }
+    const entry = { schemaVersion: '1.0.0', phase, targetIdentity: this.#targetIdentity, requestFingerprint: actionFingerprint(request), checkedAt: this.#clock().toISOString(), result };
+    return { ...entry, sha256: digest(entry) };
+  }
+
   async authorizeDispatch(request, { assertCurrent = () => {}, capabilitySnapshot = null } = {}) {
     request = structuredClone(request);
     // Snapshot custody is supplied by the trusted Gateway, never request JSON.
@@ -155,20 +183,27 @@ export class ActionService {
     if (this.#grants.get(request.principalRef)?.revision !== grantRevision) return { decision: { outcome: "denied", rationaleCodes: ["grant_changed_during_authorization"] }, action: null };
     assertCurrent();
     const fingerprint = actionFingerprint(request);
+    const replay = state => {
+      const existing = Object.values(state.actions).find(action => action.idempotencyKey === request.idempotencyKey);
+      if (!existing) return null;
+      verifyReconciliations(existing);
+      if (existing.requestFingerprint !== fingerprint) throw recoveryError('idempotency_conflict');
+      return { action: existing, duplicate: true };
+    };
+    // A retry reads the original result; changed device state cannot turn it
+    // into a new admission or another target call.
+    const prior = replay(await this.#store.load());
+    assertCurrent();
+    if (prior) return { decision, ...prior };
+    const precondition = await this.#checkPreconditions(request, 'admission');
+    assertCurrent();
     const result = await this.#store.transaction((state) => {
       assertCurrent();
       if (request.deadline && new Date(request.deadline) <= this.#clock()) return { action: null, decision: { outcome: "denied", rationaleCodes: ["deadline_exceeded"] } };
       if (this.#grants.get(request.principalRef)?.revision !== grantRevision) return { action: null, decision: { outcome: "denied", rationaleCodes: ["grant_changed_during_authorization"] } };
-      const existing = Object.values(state.actions).find((action) => action.idempotencyKey === request.idempotencyKey);
-      if (existing) {
-        verifyReconciliations(existing);
-        if (existing.requestFingerprint !== fingerprint) {
-          const error = new Error("idempotency key conflicts with a different action");
-          error.code = "idempotency_conflict";
-          throw error;
-        }
-        return { action: existing, duplicate: true };
-      }
+      const prior = replay(state);
+      if (prior) return prior;
+      if (precondition && !precondition.result.allowed) return { decision: { outcome: 'denied', rationaleCodes: [precondition.result.reasonCode] }, action: null };
       const action = {
         actionRef: randomUUID(),
         idempotencyKey: request.idempotencyKey,
@@ -189,6 +224,8 @@ export class ActionService {
         gatewayScope: request.gatewayScope ?? null,
         capabilitySnapshot,
         snapshotRequired: capabilitySnapshot !== null,
+        preconditionsRequired: precondition !== null,
+        preconditionChecks: precondition ? [precondition] : [],
         status: "admitted",
         decision: { outcome: decision.outcome, rationaleCodes: decision.rationaleCodes },
         createdAt: this.#clock().toISOString(),
@@ -215,6 +252,7 @@ export class ActionService {
   }
 
   #dispatchRestriction(action, assertCurrent, assertSnapshot) {
+    if (action.executionEnvironmentRef === 'live' && !action.preconditionChecks?.some(check => check.phase === 'admission' && check.result.allowed)) return 'target_precondition_evidence_missing';
     try { assertCurrent(); } catch { return "authority_changed_before_dispatch"; }
     if (action.capabilitySnapshot !== null && action.capabilitySnapshot !== undefined) {
       if (typeof assertSnapshot !== 'function') return 'snapshot_binding_unavailable';
@@ -261,8 +299,20 @@ export class ActionService {
     let targetResult;
     // Approval may expire or be withdrawn while admission is being persisted.
     const approvalValid = !action.approvalRequired || (this.#approvalService && await this.#approvalService.verify({ approvalRef: action.approvalRef, request: action, capabilitySnapshot: action.capabilitySnapshot }));
-    const restriction = this.#dispatchRestriction(action, assertCurrent, assertSnapshot);
-    if (restriction || !approvalValid) {
+    const precondition = approvalValid && action.preconditionsRequired ? await this.#checkPreconditions(action, 'dispatch') : null;
+    if (precondition) {
+      // Save the fresh check before the effect boundary, so interruption cannot
+      // leave a sent action with only its earlier admission observation.
+      await this.#store.transaction(state => {
+        const current = state.actions[actionRef];
+        if (!current || current.attemptRef !== action.attemptRef) throw recoveryError('action_attempt_changed');
+        verifyReconciliations(current);
+        current.preconditionChecks = [...current.preconditionChecks, precondition];
+      });
+    }
+    const approvalStillValid = approvalValid && (!action.approvalRequired || await this.#approvalService.verify({ approvalRef: action.approvalRef, request: action, capabilitySnapshot: action.capabilitySnapshot }));
+    const restriction = this.#dispatchRestriction(action, assertCurrent, assertSnapshot) ?? (precondition && !precondition.result.allowed ? precondition.result.reasonCode : null);
+    if (restriction || !approvalStillValid) {
       targetResult = { status: "denied", externalEffectOccurred: false, reasonCode: restriction ?? "approval_invalid_or_expired" };
     } else {
       targetResult = await this.#invokeTarget(action);
