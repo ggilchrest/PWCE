@@ -45,7 +45,10 @@ test('real HTTP action boundary preserves preview, version, duplicate and scoped
   assert.equal(duplicate.body.actionRef, invoked.body.actionRef);
   assert.equal(calls, 1);
   const status = { authorityContextRef: request.authorityContextRef, ...identity, executionEnvironmentRef: 'test', actionRef: invoked.body.actionRef, operation: 'capabilities.getInvocation' };
-  assert.equal((await post('/request', status)).body.status, 'known');
+  const legacyStatus = await post('/request', status);
+  assert.equal(legacyStatus.body.status, 'known');
+  assert.equal(legacyStatus.body.invocationEvidence, undefined);
+  assert.equal(legacyStatus.body.invocationEvidenceUnavailable, 'original_target_identity_missing');
   assert.equal((await post('/request', { ...status, executionEnvironmentRef: 'replay' })).body.status, 'unknown');
   const other = await post('/authority', { siteRefs: ['home.one'], ...identity, audienceRef: 'audience.other' });
   assert.equal((await post('/request', { ...status, authorityContextRef: other.body.authorityContextRef, audienceRef: 'audience.other' })).body.status, 'unknown');

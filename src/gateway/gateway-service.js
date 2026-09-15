@@ -4,6 +4,7 @@ import { explainCurrent, queryAsOf, queryHistory } from "../domain/query-service
 import { qualifyProjection } from "../domain/observation-service.js";
 import { getHealth } from "../runtime/health.js";
 import { actionFingerprint } from "../actions/approval-service.js";
+import { invocationEvidence } from "../actions/invocation-evidence.js";
 
 const PROFILE_ID = "pwce-agent-gateway.v1";
 const PROFILE_VERSION = "1.0.0";
@@ -460,7 +461,7 @@ export class GatewayService {
       }
       const action = await this.#actionService.dispatch(original.actionRef, dispatchOptions);
       current();
-      return { status: action.status === 'succeeded' ? 'completed' : action.status, actionRef: action.actionRef, decision: action.decision, result: action.result ?? action };
+      return { status: action.status === 'succeeded' ? 'completed' : action.status, actionRef: action.actionRef, decision: action.decision, result: action.result ?? action, invocationEvidence: invocationEvidence(action) };
     }
     const admitted = await this.#actionService.authorizeDispatch(request, { assertCurrent: current, capabilitySnapshot });
     if (!admitted.action) {
@@ -495,7 +496,12 @@ export class GatewayService {
     const reconciled = await this.#actionService.reconcile(actionRef, { assertCurrent,
       deadline: new Date(Math.min(Date.parse(context.expiresAt), deadline ? Date.parse(deadline) : Infinity)).toISOString() });
     assertCurrent();
-    return { status: "known", action: reconciled };
+    // Older target integrations did not declare a stable identity. Preserve
+    // their existing status view without inventing a qualified proof.
+    const evidence = reconciled.targetIdentity == null
+      ? { invocationEvidenceUnavailable: 'original_target_identity_missing' }
+      : { invocationEvidence: invocationEvidence(reconciled) };
+    return { status: "known", action: reconciled, ...evidence };
   }
 
   #observeState(state, result, previousState) {

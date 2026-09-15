@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Keep original action results visible — PWCE</title><link rel="stylesheet" href="../assets/docs.css"></head>
+<body><header class="doc-header"><a href="index.html">PWCE release notes</a><span class="doc-meta">2026-09-15 · Development Batch 177</span></header><main>
+<h1>Keep original action results visible</h1><h2>What changed</h2><p>Integrations can now verify an action result against its original permission and dispatch attempt. Later confirmation keeps the first reply visible. A failed reply whose physical effect is unknown can still be checked without sending the command again.</p>
+<h2>Why it matters</h2><p>You can see what was originally reported and what was later confirmed, without mistaking partial success or an uncertain reply for full success.</p>
+<h2>What to test</h2><ul><li><a href="../qa/inspect-local-context.html#invocation-proof">Inspect local context and request a safe action</a> — run the original result proof checks, including legacy records, later confirmation and corruption rejection.</li></ul>
+<h2>Where to read more</h2><ul><li><a href="../manual/inspect-local-context.html#invocation-proof">Check the original action result</a>.</li></ul>
+<h2>Screenshots updated</h2><p>None; Studio controls and layout are unchanged.</p>
+<h2>Known issues / follow-ups</h2><p>Lifestream invocation and status mapping remains in progress. Older targets with no declared stable identity have an explicit proof-unavailable result. These checks do not establish physical-device or Human acceptance.</p>
+</main><footer class="doc-footer">PWCE release notes · 2026-09-15</footer></body></html>

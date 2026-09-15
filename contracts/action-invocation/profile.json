@@ -1,0 +1,38 @@
+{
+  "profileId": "pwce-action-invocation.v1",
+  "profileVersion": "1.0.0",
+  "bundleId": "pwce-action-invocation.bundle.v1",
+  "bundleVersion": "1.0.0",
+  "requiredAdmissionBundle": {
+    "bundleId": "pwce-action-admission.bundle.v1",
+    "bundleVersion": "1.0.0",
+    "bundleDigest": "0379a7615ee3df928024d8f0290bbcf62b5ccb67e016ef3c3373d37a87294f8f"
+  },
+  "requiredCapabilityBundle": {
+    "bundleId": "pwce-capability-contracts.bundle.v1",
+    "bundleVersion": "1.0.0",
+    "bundleDigest": "6df58c602d8a43fdababd388c588aef631662e5904139837baa36db9c6730a0c"
+  },
+  "requiredDispatchBundle": {
+    "bundleId": "pwce-trusted-dispatch.bundle.v1",
+    "bundleVersion": "1.0.0",
+    "bundleDigest": "c61b022af86244d9da5f6b1e2222b44df22487289c0a963816f5242e0958e7be"
+  },
+  "responseField": "invocationEvidence",
+  "schemaRef": "https://pwce.local/contracts/action-invocation-evidence-1.0.0.schema.json",
+  "maximumEvidenceBytes": 131072,
+  "semantics": {
+    "source": "A bounded projection of the current durable producer action after dispatch or read-only status reconciliation. It is not a signature or permission to send an action.",
+    "identity": "actionRef and admissionEvidence.actionRef agree. Original admission evidence is unchanged across all observations. attemptRef and startedAt identify the sole durable dispatch claim; both are null before a claim. A claim can precede a target call that is subsequently refused.",
+    "status": "Preserve admitted, started and all published producer result statuses distinctly. Only succeeded with externalEffectOccurred=true confirms full requested success. Partially succeeded is not full success. Transport completion is never effect confirmation.",
+    "results": "result is the current producer result and has the same status as the action, with original producer completedAt. dispatchResult preserves the first stored dispatch reply when available. Values validate against the separately published result schema. Neither target-supplied completion times nor refreshed observation times are introduced.",
+    "reconciliation": "reconciliationRef is the last durable reconciliation entry reference or null. A reconciled current result retains the producer reconciledAt/completedAt; original dispatchResult remains unchanged. Prior observation artifacts must remain history, not be overwritten with later success. A failed reply with externalEffectOccurred=unknown is still uncertain and remains eligible for a read-only target status check.",
+    "readOnly": "capabilities.getInvocation preserves current identity and site access. It may query target status but never admits, invokes, renews the original action deadline or reconstructs an attempt. Missing and foreign actions return no proof.",
+    "bounds": "The complete JSON evidence is at most 131072 UTF-8 bytes; each producer result including host timestamps is at most 17000 bytes. Malformed custody cannot become a valid observation.",
+    "legacy": "Status reads for original targets without a declared stable targetIdentity retain their existing action view, omit invocationEvidence and return invocationEvidenceUnavailable=original_target_identity_missing. This is not qualified proof. Other malformed custody fails explicitly; the producer never fills in historical target identity."
+  },
+  "unavailableField": "invocationEvidenceUnavailable",
+  "unavailableReasons": [
+    "original_target_identity_missing"
+  ]
+}

@@ -7,6 +7,7 @@ const terminalActionStatuses = new Set(["succeeded", "partially_succeeded", "fai
 const unknownResult = reasonCode => ({ status: "outcome_unknown", externalEffectOccurred: "unknown", reasonCode });
 const recoveryError = code => Object.assign(new Error(code), { code });
 const needsReconciliation = action => action.status === 'started' ||
+  action.result?.externalEffectOccurred === 'unknown' ||
   ['outcome_unknown','timed_out','cancelled','partially_succeeded'].includes(action.status) && action.result?.externalEffectOccurred !== false;
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 function verifyReconciliations(action) {
@@ -37,7 +38,7 @@ function verifySnapshot(binding, action) {
       JSON.stringify(record.scope.slice(5, 9)) !== JSON.stringify([action.gatewayScope?.assistantRef, action.gatewayScope?.endpointRef, action.gatewayScope?.participantRefs, action.gatewayScope?.audienceRef]))) throw new Error();
   } catch { throw recoveryError('snapshot_evidence_corrupt'); }
 }
-function normalizeTargetResult(result) {
+export function normalizeTargetResult(result) {
   // Target feedback must be bounded, lossless JSON. Never persist provider-owned
   // objects or allow supplied timestamps to impersonate host reconciliation.
   let nodes = 0, bytes = 0;

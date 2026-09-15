@@ -1,0 +1,1206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pwce.local/contracts/action-invocation-evidence-1.0.0.schema.json",
+  "title": "Producer invocation state bound to original admission and attempt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "actionRef",
+    "admissionEvidence",
+    "status",
+    "attemptRef",
+    "startedAt",
+    "dispatchResult",
+    "result",
+    "reconciliationRef"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "kind": {
+      "const": "pwce.action.invocation"
+    },
+    "actionRef": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "admissionEvidence": {
+      "$ref": "https://pwce.local/contracts/action-admission-evidence-1.0.0.schema.json"
+    },
+    "status": {
+      "enum": [
+        "admitted",
+        "started",
+        "succeeded",
+        "partially_succeeded",
+        "failed",
+        "rejected",
+        "denied",
+        "timed_out",
+        "cancelled",
+        "outcome_unknown"
+      ]
+    },
+    "attemptRef": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "startedAt": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "date-time"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "dispatchResult": {
+      "anyOf": [
+        {
+          "allOf": [
+            {
+              "$ref": "https://pwce.local/contracts/home-light-set-level-result-1.0.0.schema.json"
+            },
+            {
+              "required": [
+                "completedAt"
+              ],
+              "not": {
+                "required": [
+                  "reconciledAt"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "result": {
+      "anyOf": [
+        {
+          "$ref": "https://pwce.local/contracts/home-light-set-level-result-1.0.0.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "reconciliationRef": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "OriginalAdmission": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://pwce.local/contracts/action-admission-evidence-1.0.0.schema.json",
+      "title": "Immutable producer action admission evidence; not dispatch or effect confirmation",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "actionRef",
+        "idempotencyKey",
+        "requestFingerprint",
+        "principalRef",
+        "capabilityRef",
+        "capabilityVersion",
+        "operation",
+        "siteRef",
+        "targetEntityId",
+        "parameters",
+        "executionEnvironmentRef",
+        "gatewayScope",
+        "grantRevision",
+        "targetIdentity",
+        "deadlineAt",
+        "approvalRequired",
+        "approvalRef",
+        "capabilitySnapshot",
+        "precondition",
+        "admittedAt",
+        "decision"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0"
+        },
+        "kind": {
+          "const": "pwce.action.admission"
+        },
+        "actionRef": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "idempotencyKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "requestFingerprint": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8192
+        },
+        "principalRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "capabilityRef": {
+          "const": "home.light.set_level"
+        },
+        "capabilityVersion": {
+          "const": "1.0.0"
+        },
+        "operation": {
+          "const": "light.set_level"
+        },
+        "siteRef": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+        },
+        "targetEntityId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "parameters": {
+          "$ref": "#/$defs/Parameters"
+        },
+        "executionEnvironmentRef": {
+          "enum": [
+            "normal",
+            "live",
+            "test",
+            "replay",
+            "simulation",
+            "dry-run"
+          ]
+        },
+        "gatewayScope": {
+          "$ref": "#/$defs/GatewayScope"
+        },
+        "grantRevision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "targetIdentity": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "deadlineAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "approvalRequired": {
+          "type": "boolean"
+        },
+        "approvalRef": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "capabilitySnapshot": {
+          "$ref": "#/$defs/SnapshotCustody"
+        },
+        "precondition": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PreconditionCustody"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "admittedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "decision": {
+          "$ref": "#/$defs/Decision"
+        }
+      },
+      "$defs": {
+        "Parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "level"
+          ],
+          "properties": {
+            "level": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "GatewayScope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "worldRef",
+            "assistantRef",
+            "endpointRef",
+            "participantRefs",
+            "audienceRef"
+          ],
+          "properties": {
+            "worldRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "assistantRef": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "endpointRef": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "participantRefs": {
+              "type": "array",
+              "maxItems": 32,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              }
+            },
+            "audienceRef": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "FingerprintInput": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "principalRef",
+            "capabilityRef",
+            "capabilityVersion",
+            "operation",
+            "siteRef",
+            "targetEntityId",
+            "parameters",
+            "executionEnvironmentRef",
+            "gatewayScope"
+          ],
+          "properties": {
+            "principalRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "capabilityRef": {
+              "const": "home.light.set_level"
+            },
+            "capabilityVersion": {
+              "const": "1.0.0"
+            },
+            "operation": {
+              "const": "light.set_level"
+            },
+            "siteRef": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+            },
+            "targetEntityId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "parameters": {
+              "$ref": "#/$defs/Parameters"
+            },
+            "executionEnvironmentRef": {
+              "enum": [
+                "normal",
+                "live",
+                "test",
+                "replay",
+                "simulation",
+                "dry-run"
+              ]
+            },
+            "gatewayScope": {
+              "$ref": "#/$defs/GatewayScope"
+            }
+          }
+        },
+        "AdmissionPrecondition": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schemaVersion",
+            "phase",
+            "targetIdentity",
+            "requestFingerprint",
+            "checkedAt",
+            "result"
+          ],
+          "properties": {
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "phase": {
+              "const": "admission"
+            },
+            "targetIdentity": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "requestFingerprint": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 8192
+            },
+            "checkedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "result": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "allowed",
+                "reasonCode",
+                "observed"
+              ],
+              "properties": {
+                "allowed": {
+                  "const": true
+                },
+                "reasonCode": {
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9_.-]{1,128}$"
+                },
+                "observed": {}
+              }
+            }
+          }
+        },
+        "SnapshotCustody": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "snapshotRef",
+            "sha256",
+            "expiresAt",
+            "snapshotJson"
+          ],
+          "properties": {
+            "snapshotRef": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "expiresAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "snapshotJson": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32768
+            }
+          }
+        },
+        "RetainedSnapshotDocument": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scope",
+            "sourceDigest",
+            "snapshot"
+          ],
+          "properties": {
+            "scope": {
+              "$ref": "#/$defs/SnapshotScope"
+            },
+            "sourceDigest": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "snapshot": {
+              "$ref": "#/$defs/SnapshotValue"
+            }
+          }
+        },
+        "SnapshotScope": {
+          "type": "array",
+          "minItems": 11,
+          "maxItems": 11,
+          "prefixItems": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "title": "Authority context reference"
+            },
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "title": "Principal reference"
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Principal revision"
+            },
+            {
+              "type": "integer",
+              "minimum": 0,
+              "title": "Grant revision"
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 128,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+              },
+              "title": "Authorized sites"
+            },
+            {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Assistant reference"
+            },
+            {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Endpoint reference"
+            },
+            {
+              "type": "array",
+              "maxItems": 32,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "title": "Participants"
+            },
+            {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Audience reference"
+            },
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "title": "World reference"
+            },
+            {
+              "enum": [
+                "normal",
+                "live",
+                "test",
+                "replay",
+                "simulation",
+                "dry-run"
+              ],
+              "title": "Execution environment"
+            }
+          ],
+          "items": false
+        },
+        "SnapshotValue": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "snapshotRef",
+            "profileId",
+            "profileVersion",
+            "principalRef",
+            "siteRefs",
+            "sourceRevision",
+            "issuedAt",
+            "expiresAt",
+            "invalidationSequence",
+            "capabilities",
+            "availability",
+            "limitations"
+          ],
+          "properties": {
+            "snapshotRef": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "profileId": {
+              "const": "pwce-agent-gateway.v1"
+            },
+            "profileVersion": {
+              "const": "1.0.0"
+            },
+            "principalRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "siteRefs": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 128,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+              }
+            },
+            "sourceRevision": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "issuedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "expiresAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "invalidationSequence": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "capabilities": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 1,
+              "items": {
+                "type": "object"
+              }
+            },
+            "availability": {
+              "const": "configured"
+            },
+            "limitations": {
+              "type": "array",
+              "maxItems": 8,
+              "items": {
+                "type": "string",
+                "maxLength": 500
+              }
+            }
+          }
+        },
+        "Decision": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "outcome",
+            "rationaleCodes"
+          ],
+          "properties": {
+            "outcome": {
+              "const": "allowed"
+            },
+            "rationaleCodes": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 16,
+              "items": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_.-]{1,128}$"
+              }
+            }
+          }
+        },
+        "PreconditionCustody": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "sha256",
+            "checkJson"
+          ],
+          "properties": {
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "checkJson": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 16384
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "approvalRequired": {
+                "const": true
+              }
+            },
+            "required": [
+              "approvalRequired"
+            ]
+          },
+          "then": {
+            "properties": {
+              "approvalRef": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ProducerResult": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://pwce.local/contracts/home-light-set-level-result-1.0.0.schema.json",
+      "title": "Original producer light-action result; only succeeded confirms an effect",
+      "type": "object",
+      "required": [
+        "status",
+        "externalEffectOccurred"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "succeeded",
+            "partially_succeeded",
+            "failed",
+            "rejected",
+            "denied",
+            "timed_out",
+            "cancelled",
+            "outcome_unknown"
+          ]
+        },
+        "externalEffectOccurred": {
+          "enum": [
+            true,
+            false,
+            "unknown"
+          ]
+        },
+        "reasonCode": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]{1,128}$"
+        },
+        "observed": {},
+        "dispatchAcknowledged": {
+          "type": "boolean"
+        },
+        "completedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "reconciledAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "succeeded",
+                  "partially_succeeded"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "externalEffectOccurred": {
+                "const": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "outcome_unknown"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "externalEffectOccurred": {
+                "const": "unknown"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "denied",
+                  "rejected"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "externalEffectOccurred": {
+                "const": false
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "admitted"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "const": null
+          },
+          "dispatchResult": {
+            "const": null
+          },
+          "reconciliationRef": {
+            "const": null
+          },
+          "attemptRef": {
+            "const": null
+          },
+          "startedAt": {
+            "const": null
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "started"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "const": null
+          },
+          "dispatchResult": {
+            "const": null
+          },
+          "reconciliationRef": {
+            "const": null
+          },
+          "attemptRef": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "succeeded"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "required": [
+              "completedAt"
+            ],
+            "properties": {
+              "status": {
+                "const": "succeeded"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "partially_succeeded"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "required": [
+              "completedAt"
+            ],
+            "properties": {
+              "status": {
+                "const": "partially_succeeded"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "failed"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "required": [
+              "completedAt"
+            ],
+            "properties": {
+              "status": {
+                "const": "failed"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "rejected"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "required": [
+              "completedAt"
+            ],
+            "properties": {
+              "status": {
+                "const": "rejected"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "denied"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "required": [
+              "completedAt"
+            ],
+            "properties": {
+              "status": {
+                "const": "denied"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "timed_out"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "required": [
+              "completedAt"
+            ],
+            "properties": {
+              "status": {
+                "const": "timed_out"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "cancelled"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "required": [
+              "completedAt"
+            ],
+            "properties": {
+              "status": {
+                "const": "cancelled"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "outcome_unknown"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "required": [
+              "completedAt"
+            ],
+            "properties": {
+              "status": {
+                "const": "outcome_unknown"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "attemptRef": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "attemptRef"
+        ]
+      },
+      "then": {
+        "properties": {
+          "startedAt": {
+            "const": null
+          },
+          "status": {
+            "enum": [
+              "admitted",
+              "denied",
+              "rejected"
+            ]
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "reconciliationRef": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "reconciliationRef"
+        ]
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "required": [
+              "reconciledAt"
+            ]
+          },
+          "attemptRef": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "result": {
+            "not": {
+              "type": "object",
+              "required": [
+                "reconciledAt"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}
