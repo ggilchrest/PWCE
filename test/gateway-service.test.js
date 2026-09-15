@@ -372,11 +372,12 @@ test("grant revision invalidates an existing effect authority context", async ()
   gateway.registerPrincipal({ principalRef: "agent.fixture", token: "fixture-secret-token", siteRefs: ["home.one"] });
   const context = gateway.issueAuthorityContext({ principalRef: "agent.fixture", token: "fixture-secret-token", siteRefs: ["home.one"] });
   const events = [];
-  const close = gateway.openEventStream({ siteRef: "home.one", principalRef: "agent.fixture", onEvent: (event) => events.push(event) });
+  const closed = [];
+  const close = await gateway.openEventStream({ token: "fixture-secret-token", request: { operation: "events.subscribe", authorityContextRef: context.authorityContextRef, siteRef: "home.one" }, onReplay() {}, onEvent: (event) => events.push(event), onClose: reason => closed.push(reason) });
   actions.registerGrant({ principalRef: "agent.fixture", siteRefs: [], capabilityRefs: [] });
   close();
-  assert.equal(events.some((event) => event.type === "authority.invalidated" && event.reason === "grant_revision_changed"), true);
-  assert.equal(events.some((event) => event.type === "capabilities.invalidated" && event.reason === "grant_revision_changed"), true);
+  assert.deepEqual(events, []);
+  assert.deepEqual(closed, ["authority_context_invalidated"]);
   await assert.rejects(() => gateway.request({ operation: "health.get", authorityContextRef: context.authorityContextRef }), (error) => error.code === "authority_context_invalidated");
 });
 

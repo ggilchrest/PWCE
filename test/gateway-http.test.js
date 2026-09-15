@@ -145,11 +145,32 @@ test("HTTP gateway rejects oversized response bodies", async () => {
 });
 
 test("HTTP gateway rejects an oversized initial SSE frame", async () => {
-  const gateway = { registerPrincipal() {}, async requestAuthenticated() { return { events: [{ cursor: "1", type: "context.invalidated", payload: "x".repeat(1_048_500) }] }; } };
+  const gateway = { registerPrincipal() {}, async openEventStream({ onReplay }) { onReplay({ events: [{ cursor: "1", type: "context.invalidated", payload: "x".repeat(1_048_500) }] }); return () => {}; } };
   const binding = createGatewayHttpBinding({ store: store(), token: "gateway-test-token", gateway });
   const response = await invoke(binding, { pathname: "/gateway/v1/events?authorityContextRef=authority.fixture&siteRef=home.one", authorization: "Bearer gateway-test-token" });
   assert.equal(response.status, 400);
   assert.equal(response.value.error.code, "limit_exceeded");
+});
+
+test("HTTP streams preserve scoped identities, World and execution mode", async () => {
+  const state = store();
+  const binding = createGatewayHttpBinding({ store: state, token: "gateway-test-token", siteRefs: ["home.one"] });
+  const authorization = "Bearer gateway-test-token";
+  const identity = { assistantRef: "assistant.one", endpointRef: "endpoint.one", participantRefs: ["participant.one", "participant.two"], audienceRef: "audience.private" };
+  const authority = await invoke(binding, { pathname: "/gateway/v1/authority", method: "POST", authorization, payload: { siteRefs: ["home.one"], ...identity } });
+  const params = new URLSearchParams({ ...identity, participantRefs: JSON.stringify(identity.participantRefs), authorityContextRef: authority.value.authorityContextRef, siteRef: "home.one", worldRef: "world.personal.v1", executionEnvironmentRef: "replay", requestId: "request.stream", correlationId: "correlation.stream" });
+  const response = await invoke(binding, { pathname: `/gateway/v1/events?${params}`, authorization });
+  assert.equal(response.status, 200);
+  const audit = (await state.load()).audit.find(entry => entry.type === "gateway.request" && entry.requestId === "request.stream");
+  assert.equal(audit.executionEnvironmentRef, "replay"); assert.equal(audit.correlationId, "correlation.stream"); assert.equal(audit.worldRef, "world.personal.v1");
+  for (const key of ["assistantRef", "endpointRef", "audienceRef", "worldRef"]) {
+    const invalid = new URLSearchParams(params); invalid.set(key, "other");
+    assert.equal((await invoke(binding, { pathname: `/gateway/v1/events?${invalid}`, authorization })).status, 403);
+  }
+  for (const suffix of ["&token=other", "&operation=health.get", "&audienceRef=other", "&participantRefs=%5B%5D"]) assert.equal((await invoke(binding, { pathname: `/gateway/v1/events?${params}${suffix}`, authorization })).status, 400);
+  params.set("participantRefs", "not-json");
+  assert.equal((await invoke(binding, { pathname: `/gateway/v1/events?${params}`, authorization })).status, 400);
+  binding.gateway.close();
 });
 
 test("fixture external Agent uses only the gateway HTTP contract", async () => {

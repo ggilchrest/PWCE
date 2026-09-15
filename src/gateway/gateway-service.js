@@ -80,6 +80,7 @@ export class GatewayService {
   #unsubscribe = null;
   #eventReady;
   #eventPersistenceQueue = Promise.resolve();
+  #worldRef;
 
   constructor({ store, actionService = null, clock = () => new Date(), eventRetention = 500 }) {
     this.#store = store;
@@ -118,6 +119,7 @@ export class GatewayService {
     if (typeof token !== "string" || !context || !principal || !equalDigest(principal.tokenDigest, digest(token))) throw fail("authentication_failed", "authentication failed");
     if (new Date(context.expiresAt) <= this.#clock()) throw fail("authority_context_expired", "authority context expired or unknown");
     if (context.principalRevision !== principal.revision) throw fail("authority_context_invalidated", "authority context invalidated");
+    if (context.grantRevision !== (this.#actionService?.getGrant(context.principalRef).revision ?? null)) throw fail("authority_context_invalidated", "authority context invalidated");
     return { ...context, siteRefs: [...context.siteRefs], participantRefs: [...context.participantRefs] };
   }
 
@@ -343,6 +345,8 @@ export class GatewayService {
   }
 
   #observeState(state, result, previousState) {
+    this.#worldRef = state.worldRef;
+    for (const listener of this.#eventListeners) listener.check();
     const observation = result?.observation?.recordId ? state.observations.find((candidate) => candidate.recordId === result.observation.recordId) : null;
     if (observation) this.#publishEvent({ type: "context.invalidated", siteRef: observation.payload.siteRef, affectedRef: observation.payload.entityRef, reason: "observation_accepted", sourceRevision: state.revision });
     for (const source of Object.values(state.sources)) {
@@ -368,25 +372,59 @@ export class GatewayService {
       });
     }).catch(() => undefined);
     for (const listener of this.#eventListeners) {
-      if ((listener.siteRef === siteRef || listener.principalRef === principalRef) && Number(event.cursor) > listener.afterCursor) {
+      if (listener.check() && (listener.siteRef === siteRef || listener.principalRef === principalRef) && Number(event.cursor) > listener.afterCursor) {
         listener.afterCursor = Number(event.cursor);
-        try { listener.onEvent(event); } catch { /* A disconnected stream must not affect state admission. */ }
+        try { listener.onEvent(structuredClone(event)); } catch { listener.close("stream_disconnected"); }
       }
     }
   }
 
-  openEventStream({ siteRef, principalRef = null, afterCursor = "0", onEvent }) {
-    const cursor = Number(afterCursor);
-    if (!siteRef || !Number.isInteger(cursor) || cursor < 0 || typeof onEvent !== "function") throw fail("invalid_request", "event stream parameters are invalid");
-    const listener = { siteRef, principalRef, afterCursor: cursor, onEvent };
+  async openEventStream({ token, request, onReplay, onEvent, onClose }) {
+    if (typeof onReplay !== "function" || typeof onEvent !== "function" || typeof onClose !== "function") throw fail("invalid_request", "event stream callbacks are required");
+    const input = structuredClone(request);
+    if (!input || input.operation !== "events.subscribe" || Object.hasOwn(input, "token")) throw fail("invalid_request", "event stream requires a bound subscription request");
+    const result = await this.requestAuthenticated({ ...input, token });
+    // Revalidate after asynchronous audit/replay work. Take the replay and install
+    // the listener in the same synchronous turn so no accepted event is skipped.
+    const context = this.authenticateAuthorityContext({ token, authorityContextRef: input.authorityContextRef });
+    if (result.worldRef !== this.#worldRef) throw fail("scope_denied", "world changed during subscription");
+    const replay = this.#eventReplay(context, input);
+    if (replay.hasMore) {
+      replay.events = [];
+      replay.nextCursor = String(this.#eventSequence);
+      replay.resyncRequired = true;
+      replay.resyncReason = "replay_limit_exceeded";
+    }
+    let closed = false;
+    let timeout;
+    const close = (reason = "stream_closed") => {
+      if (closed) return;
+      closed = true;
+      clearTimeout(timeout);
+      this.#eventListeners.delete(listener);
+      try { onClose(reason); } catch { /* Disconnection cannot affect state admission. */ }
+    };
+    const check = () => {
+      if (closed) return false;
+      try {
+        this.authenticateAuthorityContext({ token, authorityContextRef: input.authorityContextRef });
+        if (result.worldRef !== this.#worldRef) throw fail("scope_denied", "world changed during subscription");
+        return true;
+      } catch (error) { close(error.code ?? "authority_context_invalidated"); return false; }
+    };
+    const listener = { siteRef: input.siteRef, principalRef: context.principalRef, afterCursor: Number(replay.nextCursor), onEvent, check, close };
     this.#eventListeners.add(listener);
-    return () => this.#eventListeners.delete(listener);
+    const lifetime = Math.min(30_000, new Date(context.expiresAt).valueOf() - this.#clock().valueOf());
+    timeout = setTimeout(() => close(lifetime < 30_000 ? "authority_context_expired" : "stream_lifetime_exceeded"), Math.max(0, lifetime));
+    timeout.unref?.();
+    try { onReplay({ ...result, ...structuredClone(replay) }); } catch (error) { close("stream_disconnected"); throw error; }
+    return close;
   }
 
   close() {
     this.#unsubscribe?.();
     this.#unsubscribe = null;
-    this.#eventListeners.clear();
+    for (const listener of this.#eventListeners) listener.close("provider_closed");
   }
 
   #onGrantChanged({ principalRef, revision }) {
@@ -398,17 +436,21 @@ export class GatewayService {
 
   async #subscribeEvents(context, { siteRef, afterCursor = "0", limit = 100 } = {}) {
     await this.#eventPersistenceQueue;
+    return this.#eventReplay(context, { siteRef, afterCursor, limit });
+  }
+
+  #eventReplay(context, { siteRef, afterCursor = "0", limit = 100 } = {}) {
     if (!siteRef) throw fail("invalid_request", "events.subscribe requires siteRef");
     if (!context.siteRefs.includes(siteRef)) throw fail("scope_denied", "site is outside authority context");
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw fail("invalid_request", "events.subscribe limit outside allowed range");
     const cursor = Number(afterCursor);
-    if (!Number.isInteger(cursor) || cursor < 0) throw fail("invalid_request", "events.subscribe afterCursor must be a non-negative integer");
+    if (typeof afterCursor !== "string" || !/^(0|[1-9][0-9]*)$/.test(afterCursor) || !Number.isSafeInteger(cursor)) throw fail("invalid_request", "events.subscribe afterCursor must be a non-negative safe integer string");
     const earliest = this.#events.length ? Number(this.#events[0].cursor) : this.#eventSequence + 1;
-    const resyncRequired = cursor < earliest - 1;
+    const resyncRequired = cursor < earliest - 1 || cursor > this.#eventSequence;
     const matching = resyncRequired ? [] : this.#events.filter((event) => Number(event.cursor) > cursor && (event.watch?.siteRefs.includes(siteRef) || event.watch?.principalRefs.includes(context.principalRef)));
     const events = matching.slice(0, limit);
-    const nextCursor = events.length === limit ? events.at(-1).cursor : String(Math.max(cursor, this.#eventSequence));
-    return { profileId: PROFILE_ID, profileVersion: PROFILE_VERSION, principalRef: context.principalRef, siteRef, events, nextCursor, resyncRequired, limitations: ["This development binding carries bounded invalidation replay; it does not expose the unrestricted event bus."] };
+    const nextCursor = events.length === limit ? events.at(-1).cursor : String(this.#eventSequence);
+    return { profileId: PROFILE_ID, profileVersion: PROFILE_VERSION, principalRef: context.principalRef, siteRef, events, nextCursor, resyncRequired, hasMore: matching.length > limit, ...(resyncRequired ? { resyncReason: cursor > this.#eventSequence ? "cursor_ahead" : "cursor_expired" } : {}), limitations: ["This development binding carries bounded invalidation replay; it does not expose the unrestricted event bus."] };
   }
 
   async #publishTrace(context, { traceNamespace, events, requestId, correlationId, worldRef, executionEnvironmentRef } = {}) {
@@ -424,6 +466,7 @@ export class GatewayService {
 
   async #restoreEvents() {
     const state = await this.#store.load();
+    this.#worldRef = state.worldRef;
     const persisted = state.audit.filter((entry) => entry.type === "gateway.event" && entry.event).map((entry) => entry.event).sort((left, right) => Number(left.cursor) - Number(right.cursor));
     this.#eventSequence = persisted.reduce((maximum, event) => Math.max(maximum, Number(event.cursor) || 0), 0);
     this.#events = persisted.slice(-this.#eventRetention);

@@ -6,6 +6,7 @@ This checklist records the exact current Lifestream integration boundary without
 
 | Check | Result | Evidence |
 |---|---|---|
+| Scoped event transport, current authority lifetime and complete replay handoff | `componentPass` | `DEVELOPMENT-BATCH-165.md`; 156 producer tests and 15 Lifestream separate-process HTTP checks. Runtime cache and async provider composition remain open. |
 | Exact PWCE bundle identity, version, digest, and seven artifact pins are published | `pass` | `src/gateway/gateway-bundle.js`; `contracts/gateway/bundle-manifest.json`; `test/gateway-bundle.test.js` — digest `32c555ba675b61b4c1ec82245e314a8f6ca537484defbeb48b9fe1b6bdf4e2e2` |
 | Lifestream consumer pin matches the current PWCE bundle and generated client | `pass` | Lifestream `implementation/evidence/XR-001-pwce-consumer-reconciliation.json` at revision `0e8b7753553325680a5cc639c9ba2331d30a2f96`; implementation revision `8297cbc571aa776b47459c40185f4971e295ac2f` |
 | Lifestream mapping and compatibility tests pass against the current pins | `pass` | Thirteen targeted contract/client/mapping tests, 105 Lifestream workspace tests, strict typecheck, lint, build, and workspace structure check passed |

@@ -46,10 +46,9 @@ function sse(res, result) {
   res.writeHead(200, { ...SECURITY_HEADERS, "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-store", connection: "keep-alive" });
   const writeEvent = (event) => {
     const frame = frameFor(event);
-    if (Buffer.byteLength(frame, "utf8") > MAX_TRANSPORT_BYTES) { res.end(); return; }
-    return res.write(frame);
+    if (Buffer.byteLength(frame, "utf8") > MAX_TRANSPORT_BYTES || res.write(frame) === false) throw new Error("event stream cannot keep up");
   };
-  if (result.resyncRequired) res.write("event: resync.required\ndata: {\"reason\":\"cursor_expired\"}\n\n");
+  if (result.resyncRequired) res.write(`event: resync.required\ndata: ${JSON.stringify({ reason: result.resyncReason ?? "cursor_expired" })}\n\n`);
   for (const event of result.events) writeEvent(event);
   res.write(": gateway-replay\n\n");
   return writeEvent;
@@ -72,19 +71,36 @@ export function createGatewayHttpBinding({ store, token, principalRef = "agent.f
         return json(res, 200, gatewayBundle), true;
       }
       if (req.method === "GET" && pathname === "/gateway/v1/events") {
+        let started = false;
         try {
           const url = new URL(req.url, "http://127.0.0.1");
-          const result = await gateway.requestAuthenticated({ token: presentedToken, operation: "events.subscribe", authorityContextRef: url.searchParams.get("authorityContextRef"), siteRef: url.searchParams.get("siteRef"), afterCursor: url.searchParams.get("afterCursor") ?? "0", limit: Number(url.searchParams.get("limit") ?? 100) });
-          const writeEvent = sse(res, result);
-          if (typeof req.on !== "function") { res.end(); return true; }
-          const afterCursor = result.nextCursor;
-          const close = gateway.openEventStream({ siteRef: result.siteRef, principalRef: result.principalRef, afterCursor, onEvent: writeEvent });
-          const timeout = setTimeout(() => { close(); res.end(); }, 30_000);
-          timeout.unref?.();
-          req.on("close", () => { clearTimeout(timeout); close(); });
+          const fields = new Set(["authorityContextRef", "siteRef", "afterCursor", "limit", "profileId", "profileVersion", "requestId", "correlationId", "worldRef", "executionEnvironmentRef", "deadline", "assistantRef", "endpointRef", "participantRefs", "audienceRef"]);
+          if (Buffer.byteLength(url.search, "utf8") > 16_384 || [...url.searchParams.keys()].some(key => !fields.has(key) || url.searchParams.getAll(key).length !== 1)) {
+            const error = new Error("event subscription query is invalid or too large"); error.code = "invalid_request"; throw error;
+          }
+          const request = Object.fromEntries(url.searchParams);
+          if (request.participantRefs !== undefined) {
+            try { request.participantRefs = JSON.parse(request.participantRefs); }
+            catch { const error = new Error("participantRefs must be a JSON list"); error.code = "invalid_request"; throw error; }
+          }
+          request.limit = Number(request.limit ?? 100);
+          request.operation = "events.subscribe";
+          let writeEvent;
+          const close = await gateway.openEventStream({ token: presentedToken, request,
+            onReplay(result) { writeEvent = sse(res, result); started = true; },
+            onEvent(event) { writeEvent(event); },
+            onClose(reason) {
+              if (started && !res.writableEnded && !res.destroyed) res.write(`event: resync.required\ndata: ${JSON.stringify({ reason })}\n\n`);
+              if (started || res.headersSent) res.end();
+            }
+          });
+          if (typeof res.on !== "function") { close(); return true; }
+          res.on("close", () => close("stream_disconnected"));
+          if (res.destroyed) close("stream_disconnected");
           return true;
         } catch (error) {
-          json(res, authError(error), { error: { code: error.code ?? "gateway_request_failed", message: error.message } });
+          if (started || res.headersSent) res.end();
+          else json(res, authError(error), { error: { code: error.code ?? "gateway_request_failed", message: error.message } });
           return true;
         }
       }
