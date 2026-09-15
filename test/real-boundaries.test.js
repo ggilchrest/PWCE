@@ -132,7 +132,8 @@ test("human approval is bound to the exact action fingerprint and expiry", async
   assert.equal(await approvals.verify({ approvalRef: approval.approvalRef, request }), true);
   assert.equal(await approvals.verify({ approvalRef: approval.approvalRef, request: { ...request, principalRef: "agent.other" } }), false);
   assert.equal(await approvals.verify({ approvalRef: approval.approvalRef, request: { ...request, parameters: { level: 0.8 } } }), false);
-  assert.equal(await approvals.verify({ approvalRef: approval.approvalRef, request: { ...request, capabilityVersion: "1.0.0" } }), false);
+  assert.equal(await approvals.verify({ approvalRef: approval.approvalRef, request: { ...request, capabilityVersion: "1.0.0" } }), true);
+  assert.equal(await approvals.verify({ approvalRef: approval.approvalRef, request: { ...request, capabilityVersion: "2.0.0" } }), false);
   now = new Date("2026-09-06T12:02:00Z");
   assert.equal(await approvals.verify({ approvalRef: approval.approvalRef, request }), false);
   const expiring = await approvals.request({ request, requestedBy: "agent.fixture", expiresInMs: 60_000 });

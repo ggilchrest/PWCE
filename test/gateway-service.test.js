@@ -291,7 +291,7 @@ test("gateway effect path uses the governed ActionService when activated", async
   const invocation = await gateway.request({ operation: "capabilities.invoke", authorityContextRef: context.authorityContextRef, capabilityRef: "home.light.set_level", capabilityOperation: "light.set_level", siteRef: "home.one", targetEntityId: "light.kitchen", parameters: { level: 0.5 }, executionEnvironmentRef: "test", approvalRequired: false, idempotencyKey: "gateway-test-action" });
   assert.equal(invocation.status, "completed");
   assert.equal(invocation.result.status, "succeeded");
-  const status = await gateway.request({ operation: "capabilities.getInvocation", authorityContextRef: context.authorityContextRef, actionRef: invocation.actionRef });
+  const status = await gateway.request({ operation: "capabilities.getInvocation", authorityContextRef: context.authorityContextRef, actionRef: invocation.actionRef, executionEnvironmentRef: "test" });
   assert.equal(status.status, "known");
   const grants = await gateway.request({ operation: "authority.getGrants", authorityContextRef: context.authorityContextRef });
   assert.deepEqual(grants.capabilityRefs, ["home.light.set_level"]);
@@ -310,7 +310,7 @@ test("gateway does not replay an old action update after an unrelated state writ
   const admitted = await actions.authorizeDispatch({ principalRef: "agent.fixture", capabilityRef: "home.light.set_level", operation: "light.set_level", siteRef: "home.one", targetEntityId: "light.kitchen", parameters: { level: 0.5 }, executionEnvironmentRef: "test", approvalRequired: false, idempotencyKey: "gateway-event-dedup" });
   await actions.dispatch(admitted.action.actionRef);
   const afterAction = await gateway.request({ operation: "events.subscribe", siteRef: "home.one", afterCursor: before.nextCursor, authorityContextRef: context.authorityContextRef });
-  assert.equal(afterAction.events.filter((event) => event.type === "action.updated").length, 2);
+  assert.deepEqual(afterAction.events.filter((event) => event.type === "action.updated").map((event) => event.reason), ["action.admitted", "action.started", "action.result"]);
   await store.transaction((state) => { state.audit.push({ type: "unrelated.write", recordedAt: "2026-09-06T12:00:11Z" }); });
   const afterUnrelated = await gateway.request({ operation: "events.subscribe", siteRef: "home.one", afterCursor: afterAction.nextCursor, authorityContextRef: context.authorityContextRef });
   assert.deepEqual(afterUnrelated.events, []);

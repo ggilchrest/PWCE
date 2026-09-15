@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Action interruption recovery — PWCE</title><link rel="stylesheet" href="../assets/docs.css"></head>
+<body><header class="doc-header"><a href="index.html">PWCE release notes</a><span class="doc-meta">2026-09-15 · Development Batch 167</span></header><main>
+<h1>Action interruption recovery</h1><h2>What changed</h2><p>An interrupted action now stays uncertain until its outcome is checked. Restarting or repeating a request cannot silently send it again. Expired approvals, changed access, invalid brightness values and a different requested capability version stop a new action.</p><p>An external Assistant can read an action only under its original identity and execution scope. Approvals created before this stricter binding need fresh review. An unfinished older admission without a deadline cannot dispatch.</p>
+<h2>Why it matters</h2><p>You can distinguish a completed action from one whose outcome is still unknown, without risking an accidental repeat.</p>
+<h2>What to test</h2><ul><li><a href="../qa/inspect-local-context.html#action-recovery">Inspect local context QA</a> — focus on the action recovery criteria and synthetic regression command.</li></ul>
+<h2>Where to read more</h2><p><a href="../manual/inspect-local-context.html#action-recovery">Read action results after an interruption</a>.</p>
+<h2>Screenshots updated</h2><p>No screen layout changed. Existing screenshots remain applicable.</p>
+<h2>Known issues / follow-ups</h2><p><a href="../../../PV1-T5-CHECKLIST.md">Full Assistant integration</a> remains in progress. Lifestream action administration is still unavailable. These checks do not establish live-device or Human acceptance.</p>
+</main><footer class="doc-footer">PWCE release notes · 2026-09-15</footer></body></html>

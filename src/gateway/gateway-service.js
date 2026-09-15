@@ -129,6 +129,8 @@ export class GatewayService {
   }
 
   async request({ profileId = PROFILE_ID, profileVersion = PROFILE_VERSION, operation, authorityContextRef, requestId, correlationId, worldRef, executionEnvironmentRef = "normal", deadline, assistantRef, endpointRef, participantRefs, audienceRef, ...input }) {
+    input = structuredClone(input);
+    participantRefs = structuredClone(participantRefs);
     await this.#eventReady;
     if (profileId !== PROFILE_ID || profileVersion !== PROFILE_VERSION) throw fail("incompatible_gateway_profile", "incompatible gateway profile");
     const state = await this.#store.load();
@@ -145,8 +147,16 @@ export class GatewayService {
     if (!principal || context.principalRevision !== principal.revision) throw fail("authority_context_invalidated", "authority context invalidated");
     if (context.grantRevision !== (this.#actionService?.getGrant(context.principalRef).revision ?? null)) throw fail("authority_context_invalidated", "authority context invalidated");
     if (input.siteRef && !context.siteRefs.includes(input.siteRef)) throw fail("scope_denied", "site is outside authority context");
+    const assertCurrent = () => {
+      const current = this.#principals.get(context.principalRef);
+      if (!current || current.revision !== context.principalRevision || context.grantRevision !== (this.#actionService?.getGrant(context.principalRef).revision ?? null)) throw fail("authority_context_invalidated", "authority context invalidated");
+      if (new Date(context.expiresAt) <= this.#clock()) throw fail("authority_context_expired", "authority context expired");
+      if (this.#worldRef !== requestContext.worldRef) throw fail("scope_denied", "World changed during request");
+      if (deadline !== undefined && new Date(deadline) <= this.#clock()) throw fail("deadline_exceeded", "gateway request deadline has expired");
+    };
     const metadata = { profileId: PROFILE_ID, profileVersion: PROFILE_VERSION, ...requestContext };
     await this.#audit("gateway.request", { principalRef: context.principalRef, operation, siteRef: input.siteRef ?? null, ...requestContext });
+    assertCurrent();
     if (operation === "health.get") return { ...metadata, ...(await getHealth(this.#store, { now: this.#clock })) };
     if (operation === "context.getPreparedInputs") return this.#boundedPreparedResponse(input, { ...metadata, ...(await this.#preparedInputs(context, input)) });
     if (operation === "context.query") return this.#boundedQueryResponse(input, { ...metadata, ...(await this.#query(context, input)) });
@@ -157,8 +167,8 @@ export class GatewayService {
     if (operation === "trace.publish") return { ...metadata, ...(await this.#publishTrace(context, { ...input, ...requestContext })) };
     if (operation === "authority.authorizeDispatch") throw fail("trusted_dispatch_only", "authority.authorizeDispatch is restricted to the trusted dispatch path");
     if (operation === "capabilities.getSnapshot") return { ...metadata, ...this.#capabilitySnapshot(context) };
-    if (operation === "capabilities.invoke") return { ...metadata, ...(await this.#invokeCapability(context, { ...input, ...requestContext })) };
-    if (operation === "capabilities.getInvocation") return { ...metadata, ...(await this.#getInvocation(context, input)) };
+    if (operation === "capabilities.invoke") return { ...metadata, ...(await this.#invokeCapability(context, { ...input, ...requestContext, deadline }, assertCurrent)) };
+    if (operation === "capabilities.getInvocation") return { ...metadata, ...(await this.#getInvocation(context, { ...input, ...requestContext }, assertCurrent)) };
     throw fail("unsupported_operation", `unsupported gateway operation: ${operation}`);
   }
 
@@ -308,7 +318,27 @@ export class GatewayService {
 
   #actionRequest(context, input) {
     const executionEnvironmentRef = input.executionEnvironmentRef ?? "test";
-    return { principalRef: context.principalRef, capabilityRef: input.capabilityRef, operation: input.capabilityOperation ?? input.operation, siteRef: input.siteRef, targetEntityId: input.targetEntityId, parameters: input.parameters, executionEnvironmentRef, idempotencyKey: input.idempotencyKey, approvalRequired: executionEnvironmentRef === "live" ? true : (input.approvalRequired ?? true), approvalRef: input.approvalRef };
+    return {
+      principalRef: context.principalRef,
+      capabilityRef: input.capabilityRef,
+      capabilityVersion: input.capabilityVersion,
+      deadline: new Date(Math.min(Date.parse(context.expiresAt), input.deadline ? Date.parse(input.deadline) : this.#clock().valueOf() + 30_000)).toISOString(),
+      gatewayScope: {
+        worldRef: input.worldRef,
+        assistantRef: context.assistantRef,
+        endpointRef: context.endpointRef,
+        participantRefs: context.participantRefs,
+        audienceRef: context.audienceRef
+      },
+      operation: input.capabilityOperation ?? input.operation,
+      siteRef: input.siteRef,
+      targetEntityId: input.targetEntityId,
+      parameters: input.parameters,
+      executionEnvironmentRef,
+      idempotencyKey: input.idempotencyKey,
+      approvalRequired: executionEnvironmentRef === "live" ? true : (input.approvalRequired ?? true),
+      approvalRef: input.approvalRef
+    };
   }
 
   #evaluate(context, input = {}) {
@@ -326,21 +356,25 @@ export class GatewayService {
     };
   }
 
-  async #invokeCapability(context, input = {}) {
+  async #invokeCapability(context, input = {}, assertCurrent = () => {}) {
     if (!this.#actionService) return { status: "denied", outcome: "denied", rationaleCodes: ["effect_capabilities_not_activated"] };
     if (!input.idempotencyKey) throw fail("invalid_request", "capabilities.invoke requires idempotencyKey");
     const request = this.#actionRequest(context, input);
-    const admitted = await this.#actionService.authorizeDispatch(request);
+    const admitted = await this.#actionService.authorizeDispatch(request, { assertCurrent });
     if (!admitted.action) return { status: "denied", ...admitted.decision };
-    const action = await this.#actionService.dispatch(admitted.action.actionRef);
+    const action = await this.#actionService.dispatch(admitted.action.actionRef, { assertCurrent });
+    assertCurrent();
     const result = action.result ?? action;
     return { status: action.status === "succeeded" ? "completed" : action.status, actionRef: admitted.action.actionRef, decision: admitted.decision, result };
   }
 
-  async #getInvocation(context, { actionRef } = {}) {
+  async #getInvocation(context, { actionRef, executionEnvironmentRef } = {}, assertCurrent = () => {}) {
     if (!this.#actionService || !actionRef) return { status: "unknown", reason: "invocation_not_available" };
     const action = await this.#actionService.getInvocation(actionRef);
-    if (!action || !context.siteRefs.includes(action.siteRef) || action.principalRef !== context.principalRef) return { status: "unknown", reason: "invocation_not_found" };
+    assertCurrent();
+    if (!action || !context.siteRefs.includes(action.siteRef) || action.principalRef !== context.principalRef || action.executionEnvironmentRef !== executionEnvironmentRef) return { status: "unknown", reason: "invocation_not_found" };
+    const scope = action.gatewayScope;
+    if (!scope || scope.worldRef !== this.#worldRef || scope.assistantRef !== context.assistantRef || scope.endpointRef !== context.endpointRef || scope.audienceRef !== context.audienceRef || !Array.isArray(scope.participantRefs) || !sameIdentityList(scope.participantRefs, context.participantRefs)) return { status: "unknown", reason: "invocation_not_found" };
     return { status: "known", action };
   }
 
@@ -355,7 +389,7 @@ export class GatewayService {
     }
     const priorAuditLength = previousState?.audit?.length ?? 0;
     for (const audit of state.audit.slice(priorAuditLength)) {
-      if (audit.type !== "action.admitted" && audit.type !== "action.result" && audit.type !== "action.reconciled") continue;
+      if (audit.type !== "action.admitted" && audit.type !== "action.started" && audit.type !== "action.result" && audit.type !== "action.reconciled") continue;
       const action = state.actions[audit.actionRef];
       if (action) this.#publishEvent({ type: "action.updated", siteRef: action.siteRef, affectedRef: action.actionRef, reason: audit.type, sourceRevision: state.revision });
     }

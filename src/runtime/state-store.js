@@ -56,10 +56,14 @@ export class StateStore {
 
   async save() {
     if (!this.#state) throw new Error("state is not loaded");
+    await this.#persist(this.#state);
+  }
+
+  async #persist(state) {
     if (!this.#path) return;
     await mkdir(dirname(this.#path), { recursive: true });
     const temporaryPath = `${this.#path}.tmp`;
-    await writeFile(temporaryPath, `${JSON.stringify(this.#state, null, 2)}\n`, "utf8");
+    await writeFile(temporaryPath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
     await rename(temporaryPath, this.#path);
   }
 
@@ -75,8 +79,9 @@ export class StateStore {
       const next = structuredClone(state);
       const result = await mutator(next);
       next.revision += 1;
-      this.#state = migrateState(next);
-      await this.save();
+      const committed = migrateState(next);
+      await this.#persist(committed);
+      this.#state = committed;
       for (const listener of this.#listeners) {
         try { listener(structuredClone(this.#state), structuredClone(result), structuredClone(state)); } catch { /* Observers cannot roll back a committed state change. */ }
       }

@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
+import { capabilityFor } from "./capability-catalog.js";
 import { canonicalize } from "../contract-foundation/canonical-json.js";
 
 export function actionFingerprint(request) {
-  return canonicalize({ principalRef: request.principalRef ?? null, capabilityRef: request.capabilityRef, capabilityVersion: request.capabilityVersion ?? null, operation: request.operation, siteRef: request.siteRef, targetEntityId: request.targetEntityId, parameters: request.parameters });
+  return canonicalize({ principalRef: request.principalRef ?? null, capabilityRef: request.capabilityRef, capabilityVersion: request.capabilityVersion ?? capabilityFor(request)?.schemaVersion ?? null, operation: request.operation, siteRef: request.siteRef, targetEntityId: request.targetEntityId, parameters: request.parameters, executionEnvironmentRef: request.executionEnvironmentRef ?? "test", gatewayScope: request.gatewayScope ?? null });
 }
 
 export class ApprovalService {

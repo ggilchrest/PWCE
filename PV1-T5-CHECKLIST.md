@@ -6,6 +6,7 @@ This checklist records the exact current Lifestream integration boundary without
 
 | Check | Result | Evidence |
 |---|---|---|
+| Producer action admission, durable attempt and scoped outcome boundaries | `componentPass` | `DEVELOPMENT-BATCH-167.md`; six corrected baseline failures, 176 producer tests and 26 existing Lifestream separate-process checks. Complete action mapping remains open. |
 | Scoped event transport, current authority lifetime and complete replay handoff | `componentPass` | `DEVELOPMENT-BATCH-165.md`; 156 producer tests and 15 Lifestream separate-process HTTP checks. Runtime cache and async provider composition remain open. |
 | Lifestream scoped read-session cache and fresh authority replay | `componentPass` | `DEVELOPMENT-BATCH-166.md`; 460 source tests, 66 focused cases and 19 separate-process HTTP checks. Server prompt/authority/capability composition remains open. |
 | Exact PWCE bundle identity, version, digest, and seven artifact pins are published | `pass` | `src/gateway/gateway-bundle.js`; `contracts/gateway/bundle-manifest.json`; `test/gateway-bundle.test.js` — digest `32c555ba675b61b4c1ec82245e314a8f6ca537484defbeb48b9fe1b6bdf4e2e2` |

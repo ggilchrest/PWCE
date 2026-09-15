@@ -147,7 +147,7 @@ test("revalidates the grant before dispatch and prevents a revoked effect", asyn
   actions.registerGrant({ principalRef: "agent.fixture", siteRefs: [], capabilityRefs: [] });
   const result = await actions.dispatch(admitted.action.actionRef);
   assert.equal(result.status, "denied");
-  assert.equal(result.reasonCode, "grant_changed_before_dispatch");
+  assert.equal(result.result.reasonCode, "grant_changed_before_dispatch");
   assert.equal(target.calls, 0);
 });
 
