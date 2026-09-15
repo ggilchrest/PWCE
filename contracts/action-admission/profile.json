@@ -1,0 +1,30 @@
+{
+  "profileId": "pwce-action-admission.v1",
+  "profileVersion": "1.0.0",
+  "bundleId": "pwce-action-admission.bundle.v1",
+  "bundleVersion": "1.0.0",
+  "requiredDispatchBundle": {
+    "bundleId": "pwce-trusted-dispatch.bundle.v1",
+    "bundleVersion": "1.0.0",
+    "bundleDigest": "c61b022af86244d9da5f6b1e2222b44df22487289c0a963816f5242e0958e7be"
+  },
+  "responseField": "admissionEvidence",
+  "schemaRef": "https://pwce.local/contracts/action-admission-evidence-1.0.0.schema.json",
+  "semantics": {
+    "identity": "Derived only from the existing durable action record. All fields are original admission fields and remain byte-identical as action status and results change.",
+    "requestFingerprint": "Canonical JSON string of FingerprintInput, not a digest. Recursively sort object keys by JavaScript UTF-16 lexical order; preserve array order; serialize primitives with JSON.stringify; no whitespace.",
+    "snapshotJson": "Original UTF-8 JSON string matching RetainedSnapshotDocument. Verify byte length <=32768 and SHA-256 before parsing; preserve its original byte representation.",
+    "snapshotBinding": "Snapshot scope and value must match principal, grant revision, World, execution environment, Assistant, endpoint, participant order, audience, site and original snapshot reference/expiry. Capability definitions match the separately published exact capability bundle.",
+    "precondition": "Only the original admission-phase precondition. checkJson is its exact JSON.stringify entry string in field order schemaVersion, phase, targetIdentity, requestFingerprint, checkedAt, result. sha256 hashes its UTF-8 bytes. Verify byte length <=16384 and hash before parsing against AdmissionPrecondition. Preserve checkJson byte representation, including the original result object key order. The result must permit admission. A dispatch-phase check cannot replace it.",
+    "timestamps": "admittedAt is the original action createdAt. deadlineAt is later than admittedAt and at most 30000 ms later; it is not later than snapshot expiry. Snapshot issuedAt and the admission precondition checkedAt are no later than admittedAt. These are original producer times and are never refreshed on duplicate. An expired proof cannot restore dispatch authority.",
+    "approval": "approvalRequired and approvalRef preserve original terms; a reference alone is not approval. The producer rechecks approval at final dispatch.",
+    "custody": "This proof is a projection of producer custody, not a signature, a bearer credential, a target-call claim or permission to replay an effect. Current authority and original snapshot custody remain required for invocation.",
+    "currentState": "Current action status/result remain separate response fields; they do not alter original admission evidence. Transport or proof success does not establish effect success."
+  },
+  "requiredCapabilityBundle": {
+    "bundleId": "pwce-capability-contracts.bundle.v1",
+    "bundleVersion": "1.0.0",
+    "bundleDigest": "6df58c602d8a43fdababd388c588aef631662e5904139837baa36db9c6730a0c"
+  },
+  "maximumEvidenceBytes": 65536
+}

@@ -1,3 +1,5 @@
+import { admissionContracts, admissionSchema } from '../actions/admission-contracts.js';
+import { admissionEvidence } from '../actions/admission-evidence.js';
 import { timingSafeEqual } from "node:crypto";
 import { GatewayService, gatewayProfile } from "../gateway/gateway-service.js";
 import { gatewayBundle } from "../gateway/gateway-bundle.js";
@@ -75,6 +77,14 @@ export function createGatewayHttpBinding({ store, token, dispatcherToken = null,
         const schema = /^[a-f0-9]{64}$/.test(sha256) && capabilitySchemas.find(item => item.artifact.sha256 === sha256);
         json(res, schema ? 200 : 404, schema || gatewayError('schema_artifact_not_found')); return true;
       }
+      if (pathname === '/gateway/v1/admission-contracts' || pathname.startsWith('/gateway/v1/admission-contracts/')) {
+        if (!sameSecret(presentedToken, token)) { json(res, 401, gatewayError('authentication_failed')); return true; }
+        if (req.method !== 'GET') { json(res, 405, gatewayError('method_not_allowed')); return true; }
+        if (pathname === '/gateway/v1/admission-contracts') { json(res, 200, admissionContracts); return true; }
+        const sha256 = pathname.slice('/gateway/v1/admission-contracts/'.length);
+        const matched = /^[a-f0-9]{64}$/.test(sha256) && sha256 === admissionSchema.artifact.sha256;
+        json(res, matched ? 200 : 404, matched ? admissionSchema : gatewayError('schema_artifact_not_found')); return true;
+      }
       if (pathname === '/gateway/v1/dispatch' || pathname === '/gateway/v1/dispatch/bundle') {
         if (!dispatcherToken) { json(res, 503, gatewayError('trusted_dispatch_not_configured')); return true; }
         if (!sameSecret(presentedToken, token) || !sameSecret(req.headers['x-pwce-dispatcher-token'], dispatcherToken)) { json(res, 401, gatewayError('authentication_failed')); return true; }
@@ -88,7 +98,7 @@ export function createGatewayHttpBinding({ store, token, dispatcherToken = null,
           requireJsonContentType(req);
           const request = validateDispatchRequest(await readJsonObjectBody(req));
           const result = await gateway.requestTrustedDispatch({ ...request, token: presentedToken });
-          json(res, 200, { ...result, dispatchProfileId: dispatchBundle.dispatchProfileId, dispatchProfileVersion: dispatchBundle.dispatchProfileVersion });
+          json(res, 200, { ...result, ...(result.admission ? { admissionEvidence: admissionEvidence(result.admission) } : {}), dispatchProfileId: dispatchBundle.dispatchProfileId, dispatchProfileVersion: dispatchBundle.dispatchProfileVersion });
         } catch (error) { json(res, authError(error), gatewayError(error.code ?? 'gateway_request_failed', error.message)); }
         return true;
       }
