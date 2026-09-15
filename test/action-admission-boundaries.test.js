@@ -221,6 +221,7 @@ test('a legacy admission without a dispatch deadline cannot cross the target', a
 test('a late dispatch reply cannot erase a newer reconciliation', async () => {
   const store = new StateStore({ state: emptyState() }), gate = defer(), entered = defer();
   const actions = new ActionService({ store, target: {
+    identity: 'synthetic-target',
     async invoke() { entered.resolve(); return gate.promise; },
     async reconcile() { return { status: 'succeeded', externalEffectOccurred: true, reasonCode: 'synthetic_observation' }; }
   } });

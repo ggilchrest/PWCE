@@ -31,16 +31,16 @@ test("live Home Assistant action maps reversible level to a service call but pre
   const target = new HomeAssistantActionTarget({ adapter: { callService: async (...args) => { calls.push(args); return { status: "acknowledged", response: [] }; } } });
   const result = await target.invoke({ executionEnvironmentRef: "live", operation: "light.set_level", targetEntityId: "light.kitchen_lights", parameters: { level: 0.4 } });
   assert.equal(result.status, "outcome_unknown");
-  assert.deepEqual(calls, [["light", "turn_on", { entity_id: "light.kitchen_lights", brightness_pct: 40 }]]);
+  assert.deepEqual(calls, [["light", "turn_on", { entity_id: "light.kitchen_lights", brightness_pct: 40 }, { signal: undefined }]]);
 });
 
-test("Home Assistant reconciliation only succeeds when independent state matches", async () => {
-  const target = new HomeAssistantActionTarget({ adapter: { getState: async () => ({ value: "on", rawAttributes: { brightness: 102 } }) } });
-  const matches = await target.reconcile({ targetEntityId: "light.kitchen_lights", parameters: { level: 0.4 } });
-  assert.equal(matches.status, "succeeded");
-  const mismatchTarget = new HomeAssistantActionTarget({ adapter: { getState: async () => ({ value: "on", rawAttributes: { brightness: 255 } }) } });
-  const mismatch = await mismatchTarget.reconcile({ targetEntityId: "light.kitchen_lights", parameters: { level: 0.4 } });
-  assert.equal(mismatch.status, "outcome_unknown");
+test("Home Assistant reconciliation only succeeds when fresh independent scoped state matches", async () => {
+  const configuration = { siteRef: 'home.one', sourceRef: 'ha.one', baseUrl: 'http://synthetic.invalid' };
+  const state = { siteRef: 'home.one', sourceRef: 'ha.one', externalEntityId: 'light.synthetic', eventTime: '2026-09-15T12:00:01Z', value: 'on', rawAttributes: { brightness: 102 } };
+  const action = { siteRef: 'home.one', executionEnvironmentRef: 'live', operation: 'light.set_level', attemptRef: 'synthetic-attempt', startedAt: '2026-09-15T12:00:00Z', targetEntityId: 'light.synthetic', parameters: { level: 0.4 } };
+  const target = new HomeAssistantActionTarget({ adapter: { configuration, getState: async () => state }, clock: () => new Date('2026-09-15T12:00:02Z') });
+  assert.equal((await target.reconcile(action)).status, 'succeeded');
+  state.rawAttributes.brightness = 255; assert.equal((await target.reconcile(action)).status, 'outcome_unknown');
 });
 
 test("Home Assistant action target rejects a request for another site before calling the adapter", async () => {
@@ -49,4 +49,24 @@ test("Home Assistant action target rejects a request for another site before cal
   const result = await target.invoke({ siteRef: "home.two", executionEnvironmentRef: "live", operation: "light.set_level", targetEntityId: "light.kitchen_lights", parameters: { level: 0.4 } });
   assert.deepEqual(result, { status: "rejected", externalEffectOccurred: false, reasonCode: "target_site_mismatch" });
   assert.equal(called, false);
+});
+
+test('Home Assistant reconciliation rejects old, foreign, future or unavailable state without confirming an effect', async () => {
+  const configuration = { siteRef: 'home.one', sourceRef: 'ha.one', baseUrl: 'http://synthetic.invalid' };
+  const action = { siteRef: 'home.one', executionEnvironmentRef: 'live', operation: 'light.set_level', attemptRef: 'synthetic-attempt', startedAt: '2026-09-15T12:00:00Z', targetEntityId: 'light.synthetic', parameters: { level: 0.4 } };
+  const base = { siteRef: 'home.one', sourceRef: 'ha.one', externalEntityId: 'light.synthetic', eventTime: '2026-09-15T12:00:01Z', value: 'on', rawAttributes: { brightness: 102 } };
+  for (const change of [{ eventTime: '2026-09-15T11:59:59Z' }, { eventTime: '2026-09-15T12:00:03Z' }, { siteRef: 'other' }, { sourceRef: 'other' }, { externalEntityId: 'other' }, { value: 'unavailable' }]) {
+    const target = new HomeAssistantActionTarget({ adapter: { configuration, getState: async () => ({ ...base, ...change }) }, clock: () => new Date('2026-09-15T12:00:02Z') });
+    assert.equal((await target.reconcile(action)).status, 'outcome_unknown');
+  }
+  let reads = 0;
+  const target = new HomeAssistantActionTarget({ adapter: { configuration, getState: async () => { reads++; return base; } } });
+  assert.equal((await target.reconcile({ ...action, executionEnvironmentRef: 'replay' })).status, 'outcome_unknown');
+  assert.equal((await target.reconcile({ ...action, attemptRef: null })).status, 'outcome_unknown'); assert.equal(reads, 0);
+});
+
+test('Home Assistant off state takes precedence over a retained previous brightness attribute', async () => {
+  const target = new HomeAssistantActionTarget({ adapter: { configuration: { siteRef: 'home.one', sourceRef: 'ha.one', baseUrl: 'http://synthetic.invalid' }, getState: async () => ({ siteRef: 'home.one', sourceRef: 'ha.one', externalEntityId: 'light.synthetic', eventTime: '2026-09-15T12:00:01Z', value: 'off', rawAttributes: { brightness: 102 } }) }, clock: () => new Date('2026-09-15T12:00:02Z') });
+  const result = await target.reconcile({ siteRef: 'home.one', executionEnvironmentRef: 'live', operation: 'light.set_level', attemptRef: 'synthetic-attempt', startedAt: '2026-09-15T12:00:00Z', targetEntityId: 'light.synthetic', parameters: { level: 0 } });
+  assert.equal(result.status, 'succeeded'); assert.equal(result.observed.level, 0);
 });

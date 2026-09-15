@@ -1,14 +1,54 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { capabilityFor, capabilitySnapshot } from "./capability-catalog.js";
 import { actionFingerprint } from "./approval-service.js";
 
 const terminalActionStatuses = new Set(["succeeded", "partially_succeeded", "failed", "rejected", "denied", "timed_out", "cancelled", "outcome_unknown"]);
 
-function normalizeTargetResult(result) {
-  if (!result || typeof result !== "object" || Array.isArray(result) || !terminalActionStatuses.has(result.status) || ![true, false, "unknown"].includes(result.externalEffectOccurred)) {
-    return { status: "outcome_unknown", externalEffectOccurred: "unknown", reasonCode: "target_invalid_result" };
+const unknownResult = reasonCode => ({ status: "outcome_unknown", externalEffectOccurred: "unknown", reasonCode });
+const recoveryError = code => Object.assign(new Error(code), { code });
+const needsReconciliation = action => action.status === 'started' ||
+  ['outcome_unknown','timed_out','cancelled','partially_succeeded'].includes(action.status) && action.result?.externalEffectOccurred !== false;
+const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+function verifyReconciliations(action) {
+  for (const { sha256, ...entry } of action?.reconciliations ?? []) {
+    if (sha256 !== digest(entry) || entry.actionRef !== action.actionRef || entry.attemptRef !== action.attemptRef ||
+      entry.requestFingerprint !== action.requestFingerprint || entry.targetIdentity !== action.targetIdentity) throw recoveryError('reconciliation_evidence_corrupt');
   }
-  return result;
+  return action;
+}
+function normalizeTargetResult(result) {
+  // Target feedback must be bounded, lossless JSON. Never persist provider-owned
+  // objects or allow supplied timestamps to impersonate host reconciliation.
+  let nodes = 0, bytes = 0;
+  const seen = new Set();
+  const valid = (value, depth = 0) => {
+    if (++nodes > 2048 || depth > 24) return false;
+    if (typeof value === 'string') { bytes += Buffer.byteLength(value); return bytes <= 16384; }
+    if (value === null || typeof value === 'boolean') return true;
+    if (typeof value === 'number') return Number.isFinite(value);
+    if (!value || typeof value !== 'object' || seen.has(value) || (!Array.isArray(value) && Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)) return false;
+    seen.add(value);
+    const keys = Reflect.ownKeys(value);
+    if (Array.isArray(value) && (value.length > 2048 || keys.length !== value.length + 1)) return false;
+    for (const key of keys) {
+      if (Array.isArray(value) && key === 'length') continue;
+      if (Array.isArray(value) && (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/.test(key) || Number(key) >= value.length)) return false;
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (typeof key !== 'string' || !descriptor.enumerable || !('value' in descriptor) || !valid(key, depth + 1) || !valid(descriptor.value, depth + 1)) return false;
+    }
+    seen.delete(value); return true;
+  };
+  try {
+    if (!valid(result) || !result || Array.isArray(result) || !terminalActionStatuses.has(result.status) || ![true, false, 'unknown'].includes(result.externalEffectOccurred) ||
+      (['succeeded','partially_succeeded'].includes(result.status) && result.externalEffectOccurred !== true) ||
+      (result.status === 'outcome_unknown' && result.externalEffectOccurred !== 'unknown') ||
+      (['denied','rejected'].includes(result.status) && result.externalEffectOccurred !== false) ||
+      Object.keys(result).some(key => !['status','externalEffectOccurred','reasonCode','observed','dispatchAcknowledged'].includes(key)) ||
+      (result.reasonCode !== undefined && (typeof result.reasonCode !== 'string' || !/^[a-zA-Z0-9_.-]{1,128}$/.test(result.reasonCode))) ||
+      (result.dispatchAcknowledged !== undefined && typeof result.dispatchAcknowledged !== 'boolean')) return unknownResult('target_invalid_result');
+    const json = JSON.stringify(result);
+    return Buffer.byteLength(json) <= 16384 ? JSON.parse(json) : unknownResult('target_invalid_result');
+  } catch { return unknownResult('target_invalid_result'); }
 }
 
 
@@ -21,8 +61,13 @@ export class ActionService {
   #grants = new Map();
   #inFlight = new Map();
   #onGrantChanged;
+  #targetIdentity;
+  #reconciliationTimeoutMs;
 
-  constructor({ store, target, approvalService = null, liveEffectsEnabled = false, clock = () => new Date(), onGrantChanged = () => {} }) {
+  constructor({ store, target, approvalService = null, liveEffectsEnabled = false, clock = () => new Date(), onGrantChanged = () => {}, targetIdentity = target?.identity ?? null, reconciliationTimeoutMs = 5000 }) {
+    if (targetIdentity !== null && (typeof targetIdentity !== 'string' || targetIdentity.length < 1 || targetIdentity.length > 128)) throw new Error('invalid target identity');
+    if (!Number.isInteger(reconciliationTimeoutMs) || reconciliationTimeoutMs < 1 || reconciliationTimeoutMs > 30000) throw new Error('invalid reconciliation timeout');
+    this.#targetIdentity = targetIdentity; this.#reconciliationTimeoutMs = reconciliationTimeoutMs;
     this.#store = store;
     this.#target = target;
     this.#approvalService = approvalService;
@@ -43,7 +88,7 @@ export class ActionService {
 
   async getInvocation(actionRef) {
     const state = await this.#store.load();
-    return state.actions[actionRef] ?? null;
+    return verifyReconciliations(state.actions[actionRef]) ?? null;
   }
 
   getGrant(principalRef) {
@@ -111,6 +156,7 @@ export class ActionService {
         parameters: request.parameters,
         executionEnvironmentRef: request.executionEnvironmentRef ?? "test",
         grantRevision,
+        targetIdentity: this.#targetIdentity,
         deadlineAt: new Date(Math.min(request.deadline ? Date.parse(request.deadline) : Infinity, this.#clock().valueOf() + 30_000)).toISOString(),
         approvalRequired: Boolean(request.approvalRequired),
         approvalRef: request.approvalRef ?? null,
@@ -142,6 +188,7 @@ export class ActionService {
 
   #dispatchRestriction(action, assertCurrent) {
     try { assertCurrent(); } catch { return "authority_changed_before_dispatch"; }
+    if (action.targetIdentity && action.targetIdentity !== this.#targetIdentity) return "target_changed_before_dispatch";
     const grant = this.#grants.get(action.principalRef);
     const capability = capabilityFor(action);
     if (!capability || action.capabilityVersion !== capability.schemaVersion) return "capability_version_changed_before_dispatch";
@@ -156,6 +203,7 @@ export class ActionService {
     const claimed = await this.#store.transaction((state) => {
       const action = state.actions[actionRef];
       if (!action) throw new Error("action not found");
+      verifyReconciliations(action);
       if (terminalActionStatuses.has(action.status)) return { action, claimed: false };
       if (action.status !== "admitted") {
         action.status = "outcome_unknown";
@@ -191,10 +239,12 @@ export class ActionService {
     const updated = await this.#store.transaction((next) => {
       const current = next.actions[actionRef];
       if (!current || current.attemptRef !== action.attemptRef) throw new Error("action attempt changed before result persistence");
-      // A reconciliation is newer evidence; a delayed dispatch reply cannot erase it.
-      if (current.result?.reconciledAt) return current;
+      // Preserve the actual dispatch reply even when a newer read has already
+      // confirmed its outcome. Uncertain reads must not suppress confirmation.
+      current.dispatchResult ??= { ...targetResult, completedAt: this.#clock().toISOString() };
+      if (current.reconciliations?.length && !needsReconciliation(current)) return current;
       current.status = targetResult.status;
-      current.result = { ...targetResult, completedAt: this.#clock().toISOString() };
+      current.result = structuredClone(current.dispatchResult);
       next.audit.push({ type: "action.result", actionRef, status: current.status, recordedAt: current.result.completedAt });
       return current;
     });
@@ -224,19 +274,59 @@ export class ActionService {
     }
   }
 
-  async reconcile(actionRef) {
-    const state = await this.#store.load();
+  async reconcile(actionRef, { assertCurrent = () => {}, signal, deadline } = {}) {
+    const started = performance.now(), now = this.#clock().valueOf();
+    if (!Number.isFinite(now) || (deadline !== undefined && !Number.isFinite(Date.parse(deadline)))) throw recoveryError('invalid_reconciliation_deadline');
+    const remainingMs = Math.min(this.#reconciliationTimeoutMs, deadline === undefined ? Infinity : Date.parse(deadline) - now);
+    const deadlineAt = new Date(now + Math.max(0, remainingMs)).toISOString();
+    const check = () => { assertCurrent(); if (signal?.aborted) throw recoveryError('reconciliation_cancelled'); };
+    check();
+    if (remainingMs <= 0) throw recoveryError('reconciliation_deadline_exceeded');
+    const state = await this.#store.load(); check();
+    if (performance.now() - started >= remainingMs || this.#clock().valueOf() >= Date.parse(deadlineAt)) throw recoveryError('reconciliation_deadline_exceeded');
     const action = state.actions[actionRef];
-    if (!action) throw new Error("action not found");
-    if (typeof this.#target.reconcile !== "function") throw new Error("action target does not support reconciliation");
-    const reconciliation = await this.#target.reconcile(action);
-    const updated = await this.#store.transaction((next) => {
+    if (!action) throw recoveryError('action_not_found');
+    verifyReconciliations(action);
+    if (!needsReconciliation(action)) return action;
+    if (!action.attemptRef || !action.startedAt || !action.targetIdentity || action.targetIdentity !== this.#targetIdentity || typeof this.#target.reconcile !== 'function') return action;
+    // A read deadline is fresh: an expired dispatch deadline must not prevent
+    // checking an effect already sent. No new invocation is created here.
+    const controller = new AbortController(); let timer, onAbort;
+    let reported;
+    try {
+      const pending = Promise.resolve().then(() => { check(); if (performance.now() - started >= remainingMs || this.#clock().valueOf() >= Date.parse(deadlineAt)) throw recoveryError('reconciliation_deadline_exceeded'); return this.#target.reconcile(structuredClone(action), { signal: controller.signal, deadlineAt }); });
+      const timeout = new Promise(resolve => { timer = setTimeout(() => { resolve(unknownResult('target_reconciliation_deadline_exceeded')); controller.abort(); }, Math.max(0, remainingMs - (performance.now() - started))); });
+      const cancelled = new Promise((_, reject) => { onAbort = () => { controller.abort(); reject(recoveryError('reconciliation_cancelled')); }; signal?.addEventListener('abort', onAbort, { once: true }); if (signal?.aborted) onAbort(); });
+      try { reported = normalizeTargetResult(await Promise.race([pending, timeout, cancelled])); }
+      catch (error) { check(); if (error?.code === 'reconciliation_cancelled') throw error; reported = unknownResult('target_reconciliation_failed'); }
+      check();
+      if (performance.now() - started >= remainingMs || this.#clock().valueOf() >= Date.parse(deadlineAt)) reported = unknownResult('target_reconciliation_deadline_exceeded');
+    } finally { clearTimeout(timer); signal?.removeEventListener('abort', onAbort); controller.abort(); }
+    check();
+    const completedAt = this.#clock().toISOString();
+    const updated = await this.#store.transaction(next => {
+      check();
       const current = next.actions[actionRef];
-      current.status = reconciliation.status;
-      current.result = { ...current.result, ...reconciliation, reconciledAt: this.#clock().toISOString() };
-      next.audit.push({ type: "action.reconciled", actionRef, status: current.status, recordedAt: current.result.reconciledAt });
-      return current;
+      if (!current || current.attemptRef !== action.attemptRef || current.requestFingerprint !== action.requestFingerprint ||
+        actionFingerprint(current) !== actionFingerprint(action) || current.targetIdentity !== action.targetIdentity) throw recoveryError('reconciliation_binding_changed');
+      const history = current.reconciliations ?? [];
+      verifyReconciliations(current);
+      const same = history.at(-1)?.reportedResult && digest(history.at(-1).reportedResult) === digest(reported);
+      if (same || !needsReconciliation(current)) return current;
+      const confirming = !needsReconciliation({ status: reported.status, result: reported });
+      if (history.length >= 16 && !confirming) throw recoveryError('reconciliation_capacity');
+      // Keep the earlier projection and its exact dispatch reply. Host metadata
+      // is separate from target feedback; history is never merged into feedback.
+      current.reconciliationOrigin ??= { status: current.status, result: structuredClone(current.result) };
+      const entry = { reconciliationRef: randomUUID(), actionRef, attemptRef: action.attemptRef, requestFingerprint: action.requestFingerprint,
+        targetIdentity: action.targetIdentity, startedAt: new Date(now).toISOString(), completedAt,
+        priorStatus: current.status, priorResultSha256: digest(current.result), reportedResult: reported };
+      current.reconciliations = [...history, { ...entry, sha256: digest(entry) }];
+      current.status = reported.status;
+      current.result = { ...reported, completedAt, reconciledAt: completedAt };
+      next.audit.push({ type: 'action.reconciled', actionRef, reconciliationRef: entry.reconciliationRef, status: current.status, recordedAt: completedAt });
+      check(); return current;
     });
-    return updated.result;
+    check(); return updated.result;
   }
 }

@@ -37,7 +37,7 @@ async function executeLevel(level, idempotencyKey) {
     reconciliation = await actions.reconcile(admission.action.actionRef);
     if (reconciliation.status === "succeeded") break;
   }
-  return { level, dispatchStatus: dispatch.status, reconcileStatus: reconciliation.status, observed: reconciliation.observed };
+  return { level, dispatchStatus: dispatch.status, reconcileStatus: reconciliation.status, observed: reconciliation.result?.observed };
 }
 
 const testResult = await executeLevel(0.4, "live-light-smoke-test");

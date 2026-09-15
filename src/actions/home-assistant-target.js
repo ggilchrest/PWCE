@@ -1,30 +1,47 @@
+import { createHash } from "node:crypto";
 export class HomeAssistantActionTarget {
   #adapter;
+  #clock;
+  identity;
 
-  constructor({ adapter }) {
-    this.#adapter = adapter;
+  constructor({ adapter, clock = () => new Date() }) {
+    this.#adapter = adapter; this.#clock = clock;
+    const config = adapter.configuration;
+    this.identity = config?.siteRef && config?.sourceRef && config?.baseUrl ?
+      `home-assistant:${createHash('sha256').update(JSON.stringify([config.siteRef, config.sourceRef, config.baseUrl])).digest('hex')}` : null;
   }
 
-  async invoke(action) {
+  async invoke(action, { signal } = {}) {
+    signal?.throwIfAborted();
     if (action.siteRef !== this.#adapter.configuration?.siteRef) return { status: "rejected", externalEffectOccurred: false, reasonCode: "target_site_mismatch" };
     if (action.executionEnvironmentRef !== "live") return { status: "rejected", externalEffectOccurred: false, reasonCode: "live_target_requires_live_environment" };
     if (action.operation !== "light.set_level") return { status: "failed", externalEffectOccurred: false, reasonCode: "unsupported_home_assistant_operation" };
     const level = action.parameters?.level;
-    if (typeof level !== "number" || level < 0 || level > 1) return { status: "failed", externalEffectOccurred: false, reasonCode: "invalid_level" };
-    const acknowledgement = await this.#adapter.callService("light", "turn_on", { entity_id: action.targetEntityId, brightness_pct: Math.round(level * 100) });
+    if (!Number.isFinite(level) || level < 0 || level > 1) return { status: "failed", externalEffectOccurred: false, reasonCode: "invalid_level" };
+    const acknowledgement = await this.#adapter.callService("light", "turn_on", { entity_id: action.targetEntityId, brightness_pct: Math.round(level * 100) }, { signal });
     return { status: "outcome_unknown", externalEffectOccurred: "unknown", dispatchAcknowledged: acknowledgement.status === "acknowledged", reasonCode: "state_observation_required" };
   }
 
-  async reconcile(action) {
-    if (action.siteRef !== this.#adapter.configuration?.siteRef) return { status: "outcome_unknown", externalEffectOccurred: "unknown", reasonCode: "target_site_mismatch" };
-    const state = await this.#adapter.getState(action.targetEntityId);
-    if (!state) return { status: "outcome_unknown", externalEffectOccurred: "unknown", reasonCode: "target_state_unavailable" };
-    const requestedLevel = action.parameters?.level;
-    const brightness = state.rawAttributes?.brightness;
-    const actualLevel = typeof brightness === "number" ? brightness / 255 : state.value === "off" ? 0 : null;
+  async reconcile(action, { signal } = {}) {
+    signal?.throwIfAborted();
+    const unknown = reasonCode => ({ status: "outcome_unknown", externalEffectOccurred: "unknown", reasonCode });
+    const config = this.#adapter.configuration;
+    if (!this.identity || action.siteRef !== config.siteRef) return unknown("target_site_mismatch");
+    if (action.executionEnvironmentRef !== "live") return unknown("live_target_requires_live_environment");
+    if (action.operation !== "light.set_level" || !Number.isFinite(action.parameters?.level) || action.parameters.level < 0 || action.parameters.level > 1) return unknown("invalid_reconciliation_request");
+    if (!action.attemptRef || !Number.isFinite(Date.parse(action.startedAt))) return unknown("original_attempt_required");
+    const state = await this.#adapter.getState(action.targetEntityId, { signal });
+    signal?.throwIfAborted();
+    if (!state) return unknown("target_state_unavailable");
+    if (state.siteRef !== action.siteRef || state.sourceRef !== config.sourceRef || state.externalEntityId !== action.targetEntityId) return unknown("target_state_scope_mismatch");
+    const eventTime = Date.parse(state.eventTime);
+    if (!Number.isFinite(eventTime) || eventTime < Date.parse(action.startedAt) || eventTime > this.#clock().valueOf()) return unknown("target_state_not_current_for_attempt");
+    const requestedLevel = action.parameters.level, brightness = state.rawAttributes?.brightness;
+    const actualLevel = state.value === "off" ? 0 : state.value === "on" && Number.isFinite(brightness) && brightness >= 0 && brightness <= 255 ? brightness / 255 : null;
     const matches = actualLevel !== null && Math.abs(actualLevel - requestedLevel) <= 1 / 255;
+    const observed = { siteRef: state.siteRef, sourceRef: state.sourceRef, entityId: state.externalEntityId, eventTime: state.eventTime, state: state.value, level: actualLevel };
     return matches
-      ? { status: "succeeded", externalEffectOccurred: true, observed: { entityId: action.targetEntityId, state: state.value, level: actualLevel }, reasonCode: "state_observed_matches_request" }
-      : { status: "outcome_unknown", externalEffectOccurred: "unknown", observed: { entityId: action.targetEntityId, state: state.value, level: actualLevel }, reasonCode: "state_observed_does_not_match_request" };
+      ? { status: "succeeded", externalEffectOccurred: true, observed, reasonCode: "state_observed_matches_request" }
+      : { ...unknown("state_observed_does_not_match_request"), observed };
   }
 }

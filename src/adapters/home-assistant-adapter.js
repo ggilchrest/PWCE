@@ -36,15 +36,15 @@ export class HomeAssistantAdapter {
     return { siteRef: this.#config.siteRef, sourceRef: this.#config.sourceRef, baseUrl: this.#config.baseUrl, tokenRef: this.#config.tokenRef };
   }
 
-  async getState(entityId) {
-    const response = await this.#request(`/api/states/${encodeURIComponent(entityId)}`);
+  async getState(entityId, { signal } = {}) {
+    const response = await this.#request(`/api/states/${encodeURIComponent(entityId)}`, { signal });
     if (!response.ok) throw new Error(`Home Assistant state request failed: ${response.status}`);
     const state = await response.json();
     return this.#normalizeState(state);
   }
 
-  async callService(domain, service, serviceData) {
-    const response = await this.#request(`/api/services/${encodeURIComponent(domain)}/${encodeURIComponent(service)}`, { method: "POST", body: JSON.stringify(serviceData) });
+  async callService(domain, service, serviceData, { signal } = {}) {
+    const response = await this.#request(`/api/services/${encodeURIComponent(domain)}/${encodeURIComponent(service)}`, { method: "POST", body: JSON.stringify(serviceData), signal });
     if (!response.ok) throw new Error(`Home Assistant service request failed: ${response.status}`);
     return { status: "acknowledged", response: await response.json() };
   }
@@ -128,12 +128,14 @@ export class HomeAssistantAdapter {
   }
 
   async #request(path, options = {}) {
+    options.signal?.throwIfAborted();
     const token = await this.#resolveToken(this.#config.tokenRef);
+    options.signal?.throwIfAborted();
     if (!token) throw new Error("Home Assistant token reference could not be resolved");
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.#requestTimeoutMs);
     try {
-      return await this.#fetch(`${this.#config.baseUrl}${path}`, { ...options, signal: controller.signal, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(options.headers ?? {}) } });
+      return await this.#fetch(`${this.#config.baseUrl}${path}`, { ...options, signal: options.signal ? AbortSignal.any([options.signal, controller.signal]) : controller.signal, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(options.headers ?? {}) } });
     } finally {
       clearTimeout(timer);
     }

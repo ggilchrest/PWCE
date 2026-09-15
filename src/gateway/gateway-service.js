@@ -168,7 +168,7 @@ export class GatewayService {
     if (operation === "authority.authorizeDispatch") throw fail("trusted_dispatch_only", "authority.authorizeDispatch is restricted to the trusted dispatch path");
     if (operation === "capabilities.getSnapshot") return { ...metadata, ...this.#capabilitySnapshot(context) };
     if (operation === "capabilities.invoke") return { ...metadata, ...(await this.#invokeCapability(context, { ...input, ...requestContext, deadline }, assertCurrent)) };
-    if (operation === "capabilities.getInvocation") return { ...metadata, ...(await this.#getInvocation(context, { ...input, ...requestContext }, assertCurrent)) };
+    if (operation === "capabilities.getInvocation") return { ...metadata, ...(await this.#getInvocation(context, { ...input, ...requestContext, deadline }, assertCurrent)) };
     throw fail("unsupported_operation", `unsupported gateway operation: ${operation}`);
   }
 
@@ -368,14 +368,17 @@ export class GatewayService {
     return { status: action.status === "succeeded" ? "completed" : action.status, actionRef: admitted.action.actionRef, decision: admitted.decision, result };
   }
 
-  async #getInvocation(context, { actionRef, executionEnvironmentRef } = {}, assertCurrent = () => {}) {
+  async #getInvocation(context, { actionRef, executionEnvironmentRef, deadline } = {}, assertCurrent = () => {}) {
     if (!this.#actionService || !actionRef) return { status: "unknown", reason: "invocation_not_available" };
     const action = await this.#actionService.getInvocation(actionRef);
     assertCurrent();
     if (!action || !context.siteRefs.includes(action.siteRef) || action.principalRef !== context.principalRef || action.executionEnvironmentRef !== executionEnvironmentRef) return { status: "unknown", reason: "invocation_not_found" };
     const scope = action.gatewayScope;
     if (!scope || scope.worldRef !== this.#worldRef || scope.assistantRef !== context.assistantRef || scope.endpointRef !== context.endpointRef || scope.audienceRef !== context.audienceRef || !Array.isArray(scope.participantRefs) || !sameIdentityList(scope.participantRefs, context.participantRefs)) return { status: "unknown", reason: "invocation_not_found" };
-    return { status: "known", action };
+    const reconciled = await this.#actionService.reconcile(actionRef, { assertCurrent,
+      deadline: new Date(Math.min(Date.parse(context.expiresAt), deadline ? Date.parse(deadline) : Infinity)).toISOString() });
+    assertCurrent();
+    return { status: "known", action: reconciled };
   }
 
   #observeState(state, result, previousState) {
