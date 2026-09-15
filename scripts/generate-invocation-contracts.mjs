@@ -3,7 +3,7 @@ import {readFile,writeFile} from 'node:fs/promises';
 import {isDeepStrictEqual} from 'node:util';
 const paths=['contracts/action-invocation/profile.json','contracts/action-invocation/evidence.schema.json'];
 const sources=await Promise.all(paths.map(path=>readFile(path))),profile=JSON.parse(sources[0]),schema=JSON.parse(sources[1]);
-if(profile.profileId!=='pwce-action-invocation.v1'||profile.profileVersion!=='1.0.0'||profile.schemaRef!==schema.$id)throw new Error('unsupported invocation contract');
+if(profile.profileId!=='pwce-action-invocation.v1'||profile.profileVersion!=='1.0.1'||profile.schemaRef!==schema.$id)throw new Error('unsupported invocation contract');
 for(const [field,path] of [['requiredAdmissionBundle','contracts/action-admission/bundle-manifest.json'],['requiredCapabilityBundle','contracts/capabilities/bundle-manifest.json'],['requiredDispatchBundle','contracts/gateway-dispatch/bundle-manifest.json']]){
  const dependency=JSON.parse(await readFile(path));if(!isDeepStrictEqual(profile[field],Object.fromEntries(['bundleId','bundleVersion','bundleDigest'].map(key=>[key,dependency[key]]))))throw new Error('invocation dependency mismatch');
 }

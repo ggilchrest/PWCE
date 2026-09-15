@@ -1,8 +1,8 @@
 {
   "profileId": "pwce-action-invocation.v1",
-  "profileVersion": "1.0.0",
+  "profileVersion": "1.0.1",
   "bundleId": "pwce-action-invocation.bundle.v1",
-  "bundleVersion": "1.0.0",
+  "bundleVersion": "1.0.1",
   "requiredAdmissionBundle": {
     "bundleId": "pwce-action-admission.bundle.v1",
     "bundleVersion": "1.0.0",
@@ -19,7 +19,7 @@
     "bundleDigest": "c61b022af86244d9da5f6b1e2222b44df22487289c0a963816f5242e0958e7be"
   },
   "responseField": "invocationEvidence",
-  "schemaRef": "https://pwce.local/contracts/action-invocation-evidence-1.0.0.schema.json",
+  "schemaRef": "https://pwce.local/contracts/action-invocation-evidence-1.0.1.schema.json",
   "maximumEvidenceBytes": 131072,
   "semantics": {
     "source": "A bounded projection of the current durable producer action after dispatch or read-only status reconciliation. It is not a signature or permission to send an action.",

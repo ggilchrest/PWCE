@@ -1,8 +1,8 @@
 {
   "profileId": "pwce-action-invocation.v1",
-  "profileVersion": "1.0.0",
+  "profileVersion": "1.0.1",
   "bundleId": "pwce-action-invocation.bundle.v1",
-  "bundleVersion": "1.0.0",
+  "bundleVersion": "1.0.1",
   "requiredAdmissionBundle": {
     "bundleId": "pwce-action-admission.bundle.v1",
     "bundleVersion": "1.0.0",
@@ -19,7 +19,7 @@
     "bundleDigest": "c61b022af86244d9da5f6b1e2222b44df22487289c0a963816f5242e0958e7be"
   },
   "responseField": "invocationEvidence",
-  "schemaRef": "https://pwce.local/contracts/action-invocation-evidence-1.0.0.schema.json",
+  "schemaRef": "https://pwce.local/contracts/action-invocation-evidence-1.0.1.schema.json",
   "maximumEvidenceBytes": 131072,
   "semantics": {
     "source": "A bounded projection of the current durable producer action after dispatch or read-only status reconciliation. It is not a signature or permission to send an action.",
@@ -36,21 +36,21 @@
     "original_target_identity_missing"
   ],
   "digestAlgorithm": "sha256-ordered-path-bytes-v1",
-  "bundleDigest": "080100b1c4f57b46538d93a87a0f66fafc3c7b91a0e6baa5b42a7f539d4029c9",
+  "bundleDigest": "dafcdadf33216ae5c27429a7687f46b4bad442eac0baf2eded683cc2e122ecc6",
   "artifacts": [
     {
       "path": "contracts/action-invocation/profile.json",
-      "sha256": "dd2bb3382e5c6d734f794104f1786c9038b9f6c9cb267d97748f5820d6a02bb9"
+      "sha256": "c295a7e503237ec9da89e0da8265658e4b11c4621c7440b00f7d5976ac2e6856"
     },
     {
       "path": "contracts/action-invocation/evidence.schema.json",
-      "sha256": "ce80aa98cb6ee30559b07b58aa141ccb2c15d65e0377d9451a867323a9620c35"
+      "sha256": "5f1b0e0a05a197f6216483a9192044e096d29ce811bb541ccfa6ddfd1d75be4c"
     }
   ],
   "schemaArtifact": {
-    "reference": "https://pwce.local/contracts/action-invocation-evidence-1.0.0.schema.json",
-    "sha256": "ce80aa98cb6ee30559b07b58aa141ccb2c15d65e0377d9451a867323a9620c35",
-    "byteLength": 28214,
+    "reference": "https://pwce.local/contracts/action-invocation-evidence-1.0.1.schema.json",
+    "sha256": "5f1b0e0a05a197f6216483a9192044e096d29ce811bb541ccfa6ddfd1d75be4c",
+    "byteLength": 28280,
     "mediaType": "application/schema+json",
     "schemaRef": "https://json-schema.org/draft/2020-12/schema"
   }

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://pwce.local/contracts/action-invocation-evidence-1.0.0.schema.json",
+  "$id": "https://pwce.local/contracts/action-invocation-evidence-1.0.1.schema.json",
   "title": "Producer invocation state bound to original admission and attempt",
   "type": "object",
   "additionalProperties": false,
@@ -80,8 +80,10 @@
               "not": {
                 "required": [
                   "reconciledAt"
-                ]
-              }
+                ],
+                "type": "object"
+              },
+              "type": "object"
             }
           ]
         },

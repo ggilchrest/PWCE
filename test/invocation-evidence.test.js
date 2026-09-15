@@ -12,7 +12,7 @@ import {dispatchBundle} from '../src/gateway/dispatch-bundle.js';
 import {invocationContracts,invocationSchema} from '../src/actions/invocation-contracts.js';
 import {invocationEvidence} from '../src/actions/invocation-evidence.js';
 const hash=value=>createHash('sha256').update(value).digest('hex');
-const ajv=new Ajv2020({strict:false});addFormats(ajv);const schema=JSON.parse(invocationSchema.schemaJson),valid=ajv.compile(schema);
+const ajv=new Ajv2020({strict:true,strictRequired:false});addFormats(ajv);const schema=JSON.parse(invocationSchema.schemaJson),valid=ajv.compile(schema);
 const proofOf=response=>{assert.equal(response.status,200,JSON.stringify(response.body));assert.ok(valid(response.body.invocationEvidence),JSON.stringify(valid.errors));return response.body.invocationEvidence;};
 const admit=async f=>{const response=await f.send('/dispatch',f.request,f.headers);assert.equal(response.status,200,JSON.stringify(response.body));return response.body;};
 const invoke=(f,action)=>f.send('/dispatch',{...f.request,operation:'capabilities.invoke',actionRef:action.actionRef},f.headers);
