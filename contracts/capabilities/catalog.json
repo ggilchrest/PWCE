@@ -1,0 +1,14 @@
+{
+  "bundleId": "pwce-capability-contracts.bundle.v1",
+  "bundleVersion": "1.0.0",
+  "bundlePath": "/gateway/v1/capability-contracts",
+  "artifactPathTemplate": "/gateway/v1/capability-contracts/{sha256}",
+  "authentication": "Configured Agent bearer credential; these are public static schema artifacts, not scoped observations or grants.",
+  "capabilities": [
+    {
+      "descriptor": "contracts/capabilities/light-set-level/descriptor.json",
+      "inputSchema": "contracts/capabilities/light-set-level/input.schema.json",
+      "resultSchema": "contracts/capabilities/light-set-level/result.schema.json"
+    }
+  ]
+}

@@ -13,5 +13,9 @@
     "generate:gateway-bundle": "node scripts/generate-gateway-bundle.mjs",
     "dev": "node src/http/dev-server.js",
     "studio:generate-recovery-codes": "node scripts/generate-studio-recovery-codes.mjs"
+  },
+  "devDependencies": {
+    "ajv": "8.18.0",
+    "ajv-formats": "3.0.1"
   }
 }

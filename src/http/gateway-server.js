@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { GatewayService, gatewayProfile } from "../gateway/gateway-service.js";
 import { gatewayBundle } from "../gateway/gateway-bundle.js";
+import { capabilityContracts, capabilitySchemas } from "../actions/capability-contracts.js";
 import { dispatchBundle } from "../gateway/dispatch-bundle.js";
 import { validateDispatchRequest } from "./dispatch-contract.js";
 import { validateAuthorityRequest } from "./gateway-contract.js";
@@ -66,6 +67,14 @@ export function createGatewayHttpBinding({ store, token, dispatcherToken = null,
       if (!pathname.startsWith("/gateway/v1/")) return false;
       if (!token) { json(res, 503, gatewayError("gateway_token_not_configured")); return true; }
       const presentedToken = bearer(req);
+      if (pathname === '/gateway/v1/capability-contracts' || pathname.startsWith('/gateway/v1/capability-contracts/')) {
+        if (!sameSecret(presentedToken, token)) { json(res, 401, gatewayError('authentication_failed')); return true; }
+        if (req.method !== 'GET') { json(res, 405, gatewayError('method_not_allowed')); return true; }
+        if (pathname === '/gateway/v1/capability-contracts') { json(res, 200, capabilityContracts); return true; }
+        const sha256 = pathname.slice('/gateway/v1/capability-contracts/'.length);
+        const schema = /^[a-f0-9]{64}$/.test(sha256) && capabilitySchemas.find(item => item.artifact.sha256 === sha256);
+        json(res, schema ? 200 : 404, schema || gatewayError('schema_artifact_not_found')); return true;
+      }
       if (pathname === '/gateway/v1/dispatch' || pathname === '/gateway/v1/dispatch/bundle') {
         if (!dispatcherToken) { json(res, 503, gatewayError('trusted_dispatch_not_configured')); return true; }
         if (!sameSecret(presentedToken, token) || !sameSecret(req.headers['x-pwce-dispatcher-token'], dispatcherToken)) { json(res, 401, gatewayError('authentication_failed')); return true; }

@@ -7,3 +7,6 @@
 
 # macOS filesystem metadata.
 .DS_Store
+
+# Reproducible local development dependencies.
+/node_modules/

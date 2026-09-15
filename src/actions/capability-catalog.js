@@ -1,6 +1,6 @@
-const capabilities = new Map([
-  ["home.light.set_level", { capabilityRef: "home.light.set_level", operation: "light.set_level", effectClass: "reversible", approval: "policy", idempotency: "required", offline: "fixture_only", schemaVersion: "1.0.0" }]
-]);
+import { capabilityContracts } from "./capability-contracts.js";
+
+const capabilities = new Map(capabilityContracts.capabilities.map(capability => [capability.capabilityRef, capability]));
 export function capabilityFor(request) {
   return capabilities.get(request.capabilityRef);
 }

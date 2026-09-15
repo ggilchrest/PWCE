@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Read exact capability definitions — PWCE</title><link rel="stylesheet" href="../assets/docs.css"></head>
+<body><header class="doc-header"><a href="index.html">PWCE release notes</a><span class="doc-meta">2026-09-15 · Development Batch 175</span></header><main>
+<h1>Read exact capability definitions</h1><h2>What changed</h2><p>The light capability now provides a title, description and exact input/result definitions. An integration can retrieve the original schema bytes and verify their digest before using them.</p>
+<h2>Why it matters</h2><p>The Assistant can use PWCE's actual definitions instead of inventing its own description of valid inputs or results.</p>
+<h2>What to test</h2><ul><li><a href="../qa/inspect-local-context.html">Inspect local context and request a safe action</a> — run the new capability definition checks for exact bytes, invalid brightness and uncertain results.</li></ul>
+<h2>Where to read more</h2><ul><li><a href="../manual/inspect-local-context.html">Inspect local context and request a safe action</a> — read a capability's definition.</li></ul>
+<h2>Screenshots updated</h2><p>None; existing Studio controls and layouts are unchanged.</p>
+<h2>Known issues / follow-ups</h2><p>The full Lifestream action mapping and configured workflow remain in progress. Reading a definition does not grant permission, confirm target availability or establish an effect. No saved deployment was changed.</p>
+</main><footer class="doc-footer">PWCE release notes · 2026-09-15</footer></body></html>
