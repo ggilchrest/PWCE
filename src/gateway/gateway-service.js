@@ -1,6 +1,7 @@
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { assertRef } from "../domain/identity.js";
 import { explainCurrent, queryAsOf, queryHistory } from "../domain/query-service.js";
+import { qualifyProjection } from "../domain/observation-service.js";
 import { getHealth } from "../runtime/health.js";
 
 const PROFILE_ID = "pwce-agent-gateway.v1";
@@ -192,7 +193,7 @@ export class GatewayService {
       const needle = text.toLowerCase();
       const allowed = new Set(siteRefs);
       const matches = Object.values(state.entities).filter((entity) => allowed.has(entity.siteRef) && (entity.entityRef.toLowerCase().includes(needle) || String(entity.displayName ?? "").toLowerCase().includes(needle))).slice(0, limit).map((entity) => ({ entityRef: entity.entityRef, siteRef: entity.siteRef, displayName: entity.displayName }));
-      return this.#decorateSlice(context, input, { status: matches.length ? "known" : "unknown", query: text, matches, limitations: matches.length === limit ? ["Search results are bounded by the requested limit."] : [] });
+      return this.#decorateSlice(context, input, { status: matches.length ? "known" : "unknown", sourceRevision: materialSourceRevision(state), query: text, matches, limitations: matches.length === limit ? ["Search results are bounded by the requested limit."] : [] });
     }
     throw fail("unsupported_operation", `unsupported context query mode: ${mode}`);
   }
@@ -210,8 +211,15 @@ export class GatewayService {
       if (!item?.eventTime) return item;
       const ageMs = Math.max(0, this.#clock().valueOf() - new Date(item.eventTime).valueOf());
       if (ageMs <= input.maxAgeMs) return { ...item, freshnessAccepted: true };
-      const qualified = { ...item, status: "stale", knowledgeState: "stale", freshnessAccepted: false, limitations: [...(item.limitations ?? []), "The evidence exceeds the caller's maximum acceptable age."] };
-      if (!allowStale) { delete qualified.value; qualified.reason = "maximum_age_exceeded"; }
+      const conflict = item.knowledgeState === "conflicted";
+      const qualified = { ...item, status: conflict ? "conflicted" : "stale", knowledgeState: conflict ? "conflicted" : "stale", freshnessState: "stale", freshnessAccepted: false, limitations: [...(item.limitations ?? []), "The evidence exceeds the caller's maximum acceptable age."] };
+      if (!allowStale) {
+        delete qualified.value;
+        if (Array.isArray(qualified.contradictions)) qualified.contradictions = qualified.contradictions.map(candidate => {
+          const reference = { ...candidate }; delete reference.value; return reference;
+        });
+        qualified.reason = "maximum_age_exceeded";
+      }
       return qualified;
     };
     if (Array.isArray(result.items)) {
@@ -226,9 +234,7 @@ export class GatewayService {
     const items = siteRefs.map((requestedSiteRef) => {
       const projection = state.projections[`${requestedSiteRef}::${externalEntityId}::${property}`];
       if (!projection) return { status: "unknown", knowledgeState: "unknown", siteRef: requestedSiteRef, entityRef: `${requestedSiteRef}::${externalEntityId}`, property, evidenceRefs: [], limitations: ["No accepted observation supports this site query."] };
-      const conflicted = projection.knowledgeState === "conflicted";
-      const stale = !conflicted && projection.freshnessMs !== null && Math.max(0, this.#clock().valueOf() - new Date(projection.eventTime).valueOf()) > projection.freshnessMs;
-      return { siteRef: requestedSiteRef, ...projection, status: conflicted ? "conflicted" : stale ? "stale" : "known", knowledgeState: conflicted ? "conflicted" : stale ? "stale" : "current", evidenceRefs: conflicted ? projection.contradictions.map((contradiction) => contradiction.observationRef) : [projection.observationRef], limitations: conflicted ? ["Multiple sources reported different values at the latest event time."] : stale ? ["The latest accepted evidence is older than its declared freshness target."] : [] };
+      return qualifyProjection(projection, this.#clock());
     });
     const known = items.some((item) => item.status === "known");
     const conflicted = items.some((item) => item.status === "conflicted");
@@ -242,10 +248,7 @@ export class GatewayService {
     const projection = state.projections[key];
     const base = { sliceRef: randomUUID(), worldRef: state.worldRef, sourceRevision: materialSourceRevision(state), evaluatedAt: this.#clock().toISOString(), siteRef: input.siteRef, invalidationCursor: String(this.#eventSequence), limitations: [] };
     if (!projection) return { ...base, status: "unknown", knowledgeState: "unknown", basis: null, reason: "no_accepted_observation", entityRef: `${input.siteRef}::${input.externalEntityId}`, property: input.property };
-    const conflicted = projection.knowledgeState === "conflicted";
-    const evidenceRefs = conflicted ? projection.contradictions.map((contradiction) => contradiction.observationRef) : [projection.observationRef];
-    const stale = !conflicted && projection.freshnessMs !== null && Math.max(0, this.#clock().valueOf() - new Date(projection.eventTime).valueOf()) > projection.freshnessMs;
-    return { ...base, basis: "observed", ...projection, status: conflicted ? "conflicted" : stale ? "stale" : "known", knowledgeState: conflicted ? "conflicted" : stale ? "stale" : "current", evidenceRefs, limitations: conflicted ? ["Multiple sources reported different values at the latest event time."] : stale ? ["The latest accepted evidence is older than its declared freshness target."] : [] };
+    return { ...base, ...qualifyProjection(projection, this.#clock()) };
   }
 
   async #decorateSlice(context, input, result) {
@@ -255,9 +258,11 @@ export class GatewayService {
       ...result,
       sliceRef: randomUUID(),
       worldRef: state.worldRef,
-      sourceRevision: state.revision,
+      sourceRevision: result.sourceRevision ?? materialSourceRevision(state),
       evaluatedAt: this.#clock().toISOString(),
       siteRef: input.siteRef,
+      ...(input.externalEntityId ? { entityRef: `${input.siteRef}::${input.externalEntityId}` } : {}),
+      ...(input.property ? { property: input.property } : {}),
       invalidationCursor: String(this.#eventSequence),
       knowledgeState: result.knowledgeState ?? (status === "stale" ? "stale" : status === "known" ? "current" : "unknown"),
       basis: result.basis ?? (status === "known" || status === "stale" ? "observed" : null),
@@ -271,19 +276,12 @@ export class GatewayService {
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw fail("invalid_request", "prepared input limit outside allowed range");
     if (maxBytes !== undefined && (!Number.isInteger(maxBytes) || maxBytes < 256 || maxBytes > 262144)) throw fail("invalid_request", "prepared input maxBytes must be an integer from 256 to 262144");
     const state = await this.#store.load();
-    const allInputs = Object.values(state.projections).filter((projection) => projection.siteRef === siteRef).map((projection) => ({
-      entityRef: projection.entityRef,
-      property: projection.property,
-      value: projection.value,
-      eventTime: projection.eventTime,
-      sourceRef: projection.sourceRef,
-      evidenceRefs: [projection.observationRef],
-      quality: projection.quality,
-      freshnessMs: projection.freshnessMs
-    }));
-    const inputs = allInputs.slice(0, limit);
+    const evaluatedAt = this.#clock();
+    const revision = materialSourceRevision(state);
+    const allInputs = Object.values(state.projections).filter((projection) => projection.siteRef === siteRef);
+    const inputs = allInputs.slice(0, limit).map(projection => qualifyProjection(projection, evaluatedAt));
     const sources = Object.values(state.sources).filter((source) => source.siteRef === siteRef).map((source) => ({ sourceRef: source.sourceRef, status: source.status, lastStatusReason: source.lastStatusReason ?? null, lastEventTime: source.lastEventTime ?? null }));
-    return { profileId: PROFILE_ID, profileVersion: PROFILE_VERSION, worldRef: state.worldRef, siteRef, revision: materialSourceRevision(state), knowledgeState: inputs.length ? "known" : "unknown", inputs, sources, hasMore: allInputs.length > limit, limitations: ["Prepared inputs are bounded current projections; they are not a complete prompt or conversation context.", ...(allInputs.length > limit ? ["Prepared inputs were truncated at the requested limit."] : [])] };
+    return { profileId: PROFILE_ID, profileVersion: PROFILE_VERSION, worldRef: state.worldRef, siteRef, revision, sourceRevision: revision, evaluatedAt: evaluatedAt.toISOString(), invalidationCursor: String(this.#eventSequence), knowledgeState: inputs.some(item => item.knowledgeState === "conflicted") ? "conflicted" : inputs.some(item => item.knowledgeState === "current") ? "known" : inputs.length ? "stale" : "unknown", inputs, sources, hasMore: allInputs.length > limit, limitations: ["Prepared inputs are bounded current projections; they are not a complete prompt or conversation context.", ...(allInputs.length > limit ? ["Prepared inputs were truncated at the requested limit."] : [])] };
   }
 
   #boundedPreparedResponse(input, result) {

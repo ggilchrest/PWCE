@@ -88,12 +88,31 @@ export async function getCurrentAggregate(store, { siteRefs, externalEntityId, p
   return { status: conflicted ? "conflicted" : known ? "known" : "unknown", knowledgeState: conflicted ? "conflicted" : known ? "current" : "unknown", siteRefs: uniqueSiteRefs, externalEntityId, property, items, limitations: ["Aggregate results remain site-qualified; values are not merged across sites."] };
 }
 
+// A read projection retains both what the sources agree on and how old their
+// evidence is. These are separate dimensions: old disagreement is still a conflict.
+export function qualifyProjection(projection, at) {
+  const ageMs = Math.max(0, at.valueOf() - new Date(projection.eventTime).valueOf());
+  const hasFreshnessTarget = Number.isFinite(projection.freshnessMs) && projection.freshnessMs >= 0;
+  const freshnessState = !hasFreshnessTarget ? "unknown" : ageMs > projection.freshnessMs ? "stale" : "current";
+  const conflicted = projection.knowledgeState === "conflicted";
+  const knowledgeState = conflicted ? "conflicted" : freshnessState === "stale" ? "stale" : "current";
+  const contradictions = (projection.contradictions ?? []).map(candidate => ({ ...candidate }));
+  return {
+    ...projection, status: knowledgeState === "current" ? "known" : knowledgeState,
+    knowledgeState, basis: "observed", freshnessState, ageMs, contradictions,
+    evidenceRefs: conflicted ? contradictions.map(candidate => candidate.observationRef) : [projection.observationRef],
+    limitations: [
+      ...(conflicted ? ["Multiple sources reported different values at the latest event time."] : []),
+      ...(freshnessState === "stale" ? ["The latest accepted evidence is older than its declared freshness target."] : []),
+      ...(freshnessState === "unknown" ? ["No freshness target is declared for this evidence."] : [])
+    ]
+  };
+}
+
 export async function getCurrent(store, { siteRef, externalEntityId, property, now = () => new Date() }) {
   const state = await store.load();
   const entityRef = `${siteRef}::${externalEntityId}`;
   const projection = state.projections[projectionKey(entityRef, property)];
   if (!projection) return { status: "unknown", reason: "no_accepted_observation", siteRef, entityRef, property };
-  const conflicted = projection.knowledgeState === "conflicted";
-  const stale = !conflicted && projection.freshnessMs !== null && Math.max(0, now().valueOf() - new Date(projection.eventTime).valueOf()) > projection.freshnessMs;
-  return { ...projection, status: conflicted ? "conflicted" : stale ? "stale" : "known", knowledgeState: conflicted ? "conflicted" : stale ? "stale" : "current" };
+  return qualifyProjection(projection, now());
 }

@@ -57,6 +57,6 @@ export class BasicAgent {
     const mode = modeFor(question);
     const authority = this.#gateway.issueAuthorityContext({ principalRef: this.#principalRef, token: this.#token, siteRefs: [siteRef] });
     const result = await this.#gateway.requestAuthenticated({ token: this.#token, operation: "context.query", authorityContextRef: authority.authorityContextRef, mode, siteRef, externalEntityId: entityId, property, limit: 8 });
-    return { agentRef: this.#principalRef, agentVersion: AGENT_VERSION, mode, siteRef, entityId, property, answer: answerFor(mode, result, entityId), evidenceRefs: result.evidenceRefs ?? result.observations?.map((observation) => observation.recordId) ?? [], result, limitations: result.limitations ?? [] };
+    return { agentRef: this.#principalRef, agentVersion: AGENT_VERSION, mode, siteRef, entityId, property, answer: answerFor(mode, result, entityId), evidenceRefs: result.evidenceRefs ?? result.observations?.map((observation) => observation.observationRef) ?? [], result, limitations: result.limitations ?? [] };
   }
 }

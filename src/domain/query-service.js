@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { canonicalize } from "../contract-foundation/canonical-json.js";
+import { qualifyProjection } from "./observation-service.js";
 
 function entityRef(siteRef, externalEntityId) {
   return `${siteRef}::${externalEntityId}`;
@@ -35,7 +37,7 @@ function decodeCursor(cursor, key, stateRevision) {
 }
 
 function sourceRevision(state, input) {
-  const relevant = sortByEventTime(state.observations.filter((observation) => matches(observation, input))).map((observation) => ({ recordId: observation.recordId, eventTime: observation.eventTime, value: observation.payload.value, quality: observation.payload.quality, sourceId: observation.sourceId }));
+  const relevant = sortByEventTime(state.observations.filter((observation) => matches(observation, input))).map((observation) => ({ recordId: observation.recordId, eventTime: observation.eventTime, value: observation.payload.value, quality: observation.payload.quality, freshnessMs: observation.payload.freshnessMs, recordedAt: observation.recordedAt, sourceId: observation.sourceId }));
   return createHash("sha256").update(JSON.stringify(relevant)).digest("hex");
 }
 
@@ -50,8 +52,7 @@ function boundaryTime(value, label) {
   return parsed.toISOString();
 }
 
-export async function queryHistory(store, input) {
-  const state = await store.load();
+function historyFromState(state, input) {
   const observations = sortByEventTime(state.observations.filter((observation) => matches(observation, input)));
   const from = boundaryTime(input.from, "from");
   const to = boundaryTime(input.to, "to");
@@ -62,24 +63,41 @@ export async function queryHistory(store, input) {
   const observationsPage = bounded.slice(offset, offset + limit);
   const hasMore = bounded.length > offset + limit;
   const revision = sourceRevision(state, input);
-  return { status: bounded.length ? "known" : "unknown", siteRef: input.siteRef, entityRef: entityRef(input.siteRef, input.externalEntityId), property: input.property, observations: observationsPage.map((observation) => ({ observationRef: observation.recordId, eventTime: observation.eventTime, recordedAt: observation.recordedAt, value: observation.payload.value, quality: observation.payload.quality, sourceRef: observation.sourceId })), hasMore, nextCursor: hasMore ? encodeCursor(key, offset + limit, revision) : null, limitations: hasMore ? ["History results are bounded by the requested limit; use nextCursor to continue within this source revision."] : [] };
+  const result = { status: bounded.length ? "known" : "unknown", siteRef: input.siteRef, entityRef: entityRef(input.siteRef, input.externalEntityId), property: input.property, sourceRevision: revision, observations: observationsPage.map(summarizeObservation), hasMore, nextCursor: hasMore ? encodeCursor(key, offset + limit, revision) : null, limitations: hasMore ? ["History results are bounded by the requested limit; use nextCursor to continue within this source revision."] : [] };
+  return { result, bounded };
+}
+
+function summarizeObservation(observation) {
+  return { observationRef: observation.recordId, eventTime: observation.eventTime, recordedAt: observation.recordedAt, value: observation.payload.value, quality: observation.payload.quality, sourceRef: observation.sourceId, freshnessMs: observation.payload.freshnessMs };
+}
+
+export async function queryHistory(store, input) {
+  return historyFromState(await store.load(), input).result;
 }
 
 export async function queryAsOf(store, input) {
-  const history = await queryHistory(store, { ...input, to: input.asOf });
-  const selected = history.observations.at(-1);
-  if (!selected) return { status: "unknown", reason: "no_evidence_at_boundary", asOf: input.asOf, ...history };
-  return { status: "known", asOf: input.asOf, selected, evidenceRefs: [selected.observationRef], ...history };
+  const asOf = boundaryTime(input.asOf, "asOf");
+  if (!asOf) throw queryError("invalid_request", "asOf is required");
+  // Choose from the complete time-bounded snapshot. Pagination only limits the
+  // accompanying history page; it must never move the selected point in time.
+  const { result: history, bounded } = historyFromState(await store.load(), { ...input, to: asOf });
+  const selected = bounded.at(-1);
+  if (!selected) return { ...history, status: "unknown", knowledgeState: "unknown", basis: null, reason: "no_evidence_at_boundary", asOf };
+  const latest = bounded.filter(observation => observation.eventTime === selected.eventTime);
+  const values = new Map(latest.map(observation => [canonicalize(observation.payload.value), observation]));
+  const contradictions = values.size > 1 ? [...values.values()].map(summarizeObservation) : [];
+  const qualified = qualifyProjection({ ...summarizeObservation(selected), knowledgeState: values.size > 1 ? "conflicted" : "current", contradictions }, new Date(asOf));
+  const boundary = { ...history, status: qualified.status, knowledgeState: qualified.knowledgeState, basis: "observed", asOf,
+    eventTime: selected.eventTime, freshnessMs: qualified.freshnessMs, freshnessState: qualified.freshnessState, ageMs: qualified.ageMs,
+    evidenceRefs: qualified.evidenceRefs, limitations: [...history.limitations, ...qualified.limitations] };
+  if (values.size > 1) return { ...boundary, contradictions, limitations: [...boundary.limitations, "No single value is selected at this historical boundary."] };
+  return { ...boundary, selected: summarizeObservation(selected) };
 }
 
 export async function explainCurrent(store, input, { now = () => new Date() } = {}) {
   const state = await store.load();
   const key = `${entityRef(input.siteRef, input.externalEntityId)}::${input.property}`;
   const projection = state.projections[key];
-  if (!projection) return { status: "unknown", reason: "no_accepted_observation", limitations: ["No accepted Observation supports this query."] };
-  const ageMs = Math.max(0, now().valueOf() - new Date(projection.eventTime).valueOf());
-  const stale = projection.freshnessMs !== null && ageMs > projection.freshnessMs;
-  const conflicted = projection.knowledgeState === "conflicted";
-  const evidenceRefs = conflicted ? projection.contradictions.map((contradiction) => contradiction.observationRef) : [projection.observationRef];
-  return { status: conflicted ? "conflicted" : stale ? "stale" : "known", knowledgeState: conflicted ? "conflicted" : stale ? "stale" : "current", value: projection.value, contradictions: projection.contradictions ?? [], siteRef: projection.siteRef, entityRef: projection.entityRef, property: projection.property, eventTime: projection.eventTime, freshnessMs: projection.freshnessMs, ageMs, sourceRef: projection.sourceRef, evidenceRefs, limitations: conflicted ? ["Multiple sources reported different values at the latest event time."] : stale ? ["The latest accepted evidence is older than its declared freshness target."] : [] };
+  if (!projection) return { status: "unknown", sourceRevision: sourceRevision(state, input), reason: "no_accepted_observation", limitations: ["No accepted Observation supports this query."] };
+  return { ...qualifyProjection(projection, now()), sourceRevision: sourceRevision(state, input) };
 }
