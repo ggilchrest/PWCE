@@ -212,7 +212,11 @@ export class GatewayService {
     if (operation === "context.getPreparedInputs") return this.#boundedPreparedResponse(input, { ...metadata, ...(await this.#preparedInputs(context, input)) });
     if (operation === "context.query") return this.#boundedQueryResponse(input, { ...metadata, ...(await this.#query(context, input)) });
     if (operation === "evidence.get") return { ...metadata, ...(await this.#evidence(context, input)) };
-    if (operation === "authority.getGrants") return { ...metadata, ...(await this.#grants(context)) };
+    if (operation === "authority.getGrants") {
+      const result = await this.#grants(context);
+      assertCurrent();
+      return { ...metadata, ...result };
+    }
     if (operation === "authority.evaluate") return { ...metadata, ...(await this.#evaluate(context, { ...input, ...requestContext })) };
     if (operation === "events.subscribe") return { ...metadata, ...(await this.#subscribeEvents(context, input)) };
     if (operation === "trace.publish") return { ...metadata, ...(await this.#publishTrace(context, { ...input, ...requestContext })) };
@@ -360,7 +364,10 @@ export class GatewayService {
     const grant = this.#actionService?.getGrant(context.principalRef);
     const siteRefs = grant ? grant.siteRefs.filter((siteRef) => context.siteRefs.includes(siteRef)) : [...context.siteRefs];
     const capabilityRefs = grant?.capabilityRefs ?? [];
-    return { profileId: PROFILE_ID, profileVersion: PROFILE_VERSION, principalRef: context.principalRef, siteRefs, capabilityRefs, sourceRevision: materialSourceRevision(state), limitations: capabilityRefs.length ? [] : ["No effect capability grant is activated in the current gateway tier."] };
+    // This is a scoped permission projection, not a World-data revision or a
+    // local Human grant. Preserve permission generations even when terms recur.
+    const sourceRevision = digest(JSON.stringify({ worldRef: state.worldRef, principalRef: context.principalRef, grantRevision: grant?.revision ?? null, siteRefs, capabilityRefs })).toString("hex");
+    return { profileId: PROFILE_ID, profileVersion: PROFILE_VERSION, principalRef: context.principalRef, siteRefs, capabilityRefs, sourceRevision, limitations: capabilityRefs.length ? [] : ["No effect capability grant is activated in the current gateway tier."] };
   }
 
   #snapshotScope(context, input) {
