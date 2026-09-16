@@ -1,3 +1,4 @@
+import {validateApprovalRecoveryRequest} from './approval-recovery-validation.js';
 import {admissionEvidence} from '../actions/admission-evidence.js';
 import {validateAdmissionRecoveryRequest} from './admission-recovery-validation.js';
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
@@ -138,6 +139,12 @@ export class GatewayService {
     return this.request(request);
   }
 
+  async recoverApprovalAuthenticated({token,...input}) {
+    const request=validateApprovalRecoveryRequest(input);this.authenticateAuthorityContext({token,authorityContextRef:request.authorityContextRef});
+    const remaining=Date.parse(request.deadline)-this.#clock().valueOf();if(!Number.isFinite(remaining)||remaining<=0||remaining>30000)throw fail('deadline_exceeded','approval recovery requires a current bounded read deadline');
+    return this.#request(request,false,false,true);
+  }
+
   async recoverAdmissionAuthenticated({token,...input}) {
     const request = validateAdmissionRecoveryRequest(input);
     this.authenticateAuthorityContext({token,authorityContextRef:request.authorityContextRef});
@@ -159,7 +166,7 @@ export class GatewayService {
     return this.#request(request, true);
   }
 
-  async #request({ profileId = PROFILE_ID, profileVersion = PROFILE_VERSION, operation, authorityContextRef, requestId, correlationId, worldRef, executionEnvironmentRef = "normal", deadline, assistantRef, endpointRef, participantRefs, audienceRef, ...input }, trustedDispatch = false, admissionRecovery = false) {
+  async #request({ profileId = PROFILE_ID, profileVersion = PROFILE_VERSION, operation, authorityContextRef, requestId, correlationId, worldRef, executionEnvironmentRef = "normal", deadline, assistantRef, endpointRef, participantRefs, audienceRef, ...input }, trustedDispatch = false, admissionRecovery = false, approvalRecovery = false) {
     input = structuredClone(input);
     participantRefs = structuredClone(participantRefs);
     await this.#eventReady;
@@ -188,6 +195,13 @@ export class GatewayService {
     const metadata = { profileId: PROFILE_ID, profileVersion: PROFILE_VERSION, ...requestContext };
     await this.#audit("gateway.request", { principalRef: context.principalRef, operation, siteRef: input.siteRef ?? null, ...requestContext });
     assertCurrent();
+    if(operation==='authority.recoverApproval'){
+      if(!approvalRecovery)throw fail('unsupported_operation','approval recovery requires its separately negotiated transport');
+      const evidence=await this.#actionService?.readGatewayApprovalEvidence({principalRef:context.principalRef,requestKey:input.idempotencyKey,requestFingerprint:input.requestFingerprint,originalSnapshotRef:input.originalSnapshotRef,assertCurrent});assertCurrent();
+      const scope=evidence?.review?.request?.gatewayScope;
+      const matched=evidence&&JSON.parse(evidence.snapshot.snapshotJson).scope[0]===context.authorityContextRef&&context.siteRefs.includes(evidence.siteRef)&&evidence.review.request.executionEnvironmentRef===requestContext.executionEnvironmentRef&&scope?.worldRef===requestContext.worldRef&&scope.assistantRef===context.assistantRef&&scope.endpointRef===context.endpointRef&&scope.audienceRef===context.audienceRef&&sameIdentityList(scope.participantRefs,context.participantRefs);
+      return {...metadata,approvalProfileId:'pwce-approval-recovery.v1',approvalProfileVersion:'1.0.0',status:matched?'known':'unknown',reason:matched?null:'approval_not_found',approvalEvidence:matched?evidence:null};
+    }
     if (operation === 'authority.recoverAdmission') {
       if (!admissionRecovery) throw fail('unsupported_operation', 'admission recovery requires its separately negotiated transport');
       const result = await this.#recoverAdmission(context, {...input,...requestContext}, assertCurrent);

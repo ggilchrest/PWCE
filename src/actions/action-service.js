@@ -152,6 +152,8 @@ export class ActionService {
     return { outcome: "allowed", rationaleCodes: ["explicit_grant_active"], capabilityRef: capability.capabilityRef, effectClass: capability.effectClass };
   }
 
+  async readGatewayApprovalEvidence(input) { return this.#approvalService ? this.#approvalService.readGatewayEvidence(input) : null; }
+
   async requestGatewayApproval(request, { assertCurrent, capabilitySnapshot }) {
     request = structuredClone(request); capabilitySnapshot = structuredClone(capabilitySnapshot);
     assertCurrent(); verifySnapshot(capabilitySnapshot, request);

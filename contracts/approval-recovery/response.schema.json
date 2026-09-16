@@ -1,0 +1,512 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pwce.local/contracts/pwce-approval-recovery-response-1.0.0.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profileId",
+    "profileVersion",
+    "requestId",
+    "correlationId",
+    "worldRef",
+    "executionEnvironmentRef",
+    "approvalProfileId",
+    "approvalProfileVersion",
+    "status",
+    "reason",
+    "approvalEvidence"
+  ],
+  "properties": {
+    "profileId": {
+      "const": "pwce-agent-gateway.v1"
+    },
+    "profileVersion": {
+      "const": "1.0.0"
+    },
+    "requestId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "correlationId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "worldRef": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "executionEnvironmentRef": {
+      "enum": [
+        "normal",
+        "live",
+        "test",
+        "replay",
+        "simulation",
+        "dry-run"
+      ]
+    },
+    "approvalProfileId": {
+      "const": "pwce-approval-recovery.v1"
+    },
+    "approvalProfileVersion": {
+      "const": "1.0.0"
+    },
+    "status": {
+      "enum": [
+        "known",
+        "unknown"
+      ]
+    },
+    "reason": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "approvalEvidence": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/OriginalApproval"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "OriginalApproval": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://pwce.local/contracts/pwce-approval-evidence-1.0.0.schema.json",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "approvalRef",
+        "requestKey",
+        "requestFingerprint",
+        "principalRef",
+        "siteRef",
+        "capabilityRef",
+        "status",
+        "createdAt",
+        "expiresAt",
+        "approvedBy",
+        "approvedAt",
+        "humanProof",
+        "review",
+        "snapshot",
+        "confirmationDigest"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0"
+        },
+        "kind": {
+          "const": "pwce.action.approval"
+        },
+        "approvalRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "requestKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "requestFingerprint": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16384
+        },
+        "principalRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "siteRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "capabilityRef": {
+          "const": "home.light.set_level"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "approved",
+            "expired"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "approvedBy": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "approvedAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "humanProof": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "principalRef",
+                "authenticationMethod",
+                "authenticatedAt",
+                "verifiedAt"
+              ],
+              "properties": {
+                "principalRef": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "authenticationMethod": {
+                  "enum": [
+                    "password",
+                    "recovery_code"
+                  ]
+                },
+                "authenticatedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "verifiedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "review": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "request",
+            "idempotencyKey",
+            "effectSummary",
+            "effectClass"
+          ],
+          "properties": {
+            "request": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "principalRef",
+                "capabilityRef",
+                "capabilityVersion",
+                "operation",
+                "siteRef",
+                "targetEntityId",
+                "parameters",
+                "executionEnvironmentRef",
+                "gatewayScope"
+              ],
+              "properties": {
+                "principalRef": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "capabilityRef": {
+                  "const": "home.light.set_level"
+                },
+                "capabilityVersion": {
+                  "const": "1.0.0"
+                },
+                "operation": {
+                  "const": "light.set_level"
+                },
+                "siteRef": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "targetEntityId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "parameters": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "level"
+                  ],
+                  "properties": {
+                    "level": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    }
+                  }
+                },
+                "executionEnvironmentRef": {
+                  "enum": [
+                    "normal",
+                    "live",
+                    "test",
+                    "replay",
+                    "simulation",
+                    "dry-run"
+                  ]
+                },
+                "gatewayScope": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "worldRef",
+                    "assistantRef",
+                    "endpointRef",
+                    "participantRefs",
+                    "audienceRef"
+                  ],
+                  "properties": {
+                    "worldRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "assistantRef": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "endpointRef": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "participantRefs": {
+                      "type": "array",
+                      "maxItems": 32,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      }
+                    },
+                    "audienceRef": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "idempotencyKey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "effectSummary": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "effectClass": {
+              "const": "reversible"
+            }
+          }
+        },
+        "snapshot": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "snapshotRef",
+            "sha256",
+            "expiresAt",
+            "snapshotJson"
+          ],
+          "properties": {
+            "snapshotRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "expiresAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "snapshotJson": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32768
+            }
+          }
+        },
+        "confirmationDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "approved"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "approvedBy": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "approvedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "humanProof": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "principalRef",
+                  "authenticationMethod",
+                  "authenticatedAt",
+                  "verifiedAt"
+                ],
+                "properties": {
+                  "principalRef": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "authenticationMethod": {
+                    "enum": [
+                      "password",
+                      "recovery_code"
+                    ]
+                  },
+                  "authenticatedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "verifiedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "approvedBy": {
+                "type": "null"
+              },
+              "approvedAt": {
+                "type": "null"
+              },
+              "humanProof": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "known"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "reason": {
+            "type": "null"
+          },
+          "approvalEvidence": {
+            "$ref": "#/$defs/OriginalApproval"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "reason": {
+            "const": "approval_not_found"
+          },
+          "approvalEvidence": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ]
+}

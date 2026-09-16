@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util';
 import { createHash, randomUUID } from "node:crypto";
 import { capabilityFor } from "./capability-catalog.js";
 import { canonicalize } from "../contract-foundation/canonical-json.js";
@@ -72,6 +73,26 @@ export class ApprovalService {
       assertCurrent(); return approval;
     });
     assertCurrent(); return approvalView(result.result);
+  }
+
+  /** Original qualified record only. This read does not advance expiry state. */
+  async readGatewayEvidence({ principalRef, requestKey, requestFingerprint, originalSnapshotRef, assertCurrent }) {
+    assertCurrent();const state=await this.#store.load();assertCurrent();
+    const matches=Object.values(state.approvals).filter(item=>item.gatewayReview&&item.principalRef===principalRef&&item.requestKey===requestKey);if(matches.length>1)throw failure('approval_evidence_corrupt');const approval=matches[0];
+    if(!approval||approval.actionFingerprint!==requestFingerprint||approval.gatewaySnapshot?.snapshotRef!==originalSnapshotRef)return null;
+    checkGatewayApproval(approval);
+    const text=(value,max=128)=>typeof value==='string'&&value.length>0&&value.length<=max;
+    const time=value=>typeof value==='string'&&Number.isFinite(Date.parse(value));
+    const keys=(value,expected)=>value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).sort().join(',')===expected;
+    const review=approval.gatewayReview,r=review.request,g=r.gatewayScope,snapshot=approval.gatewaySnapshot;
+    let source;try{source=JSON.parse(snapshot.snapshotJson);}catch{throw failure('approval_evidence_corrupt');}
+    if(!['pending','approved','expired'].includes(approval.status)||!text(approval.approvalRef)||!text(approval.requestKey)||!text(approval.principalRef)||!text(approval.siteRef)||!text(r.targetEntityId)||!time(approval.createdAt)||!time(approval.expiresAt)||Date.parse(approval.expiresAt)<=Date.parse(approval.createdAt)||
+      !keys(review,'effectClass,effectSummary,idempotencyKey,request')||!text(review.effectSummary,4096)||review.effectClass!=='reversible'||r.capabilityRef!=='home.light.set_level'||r.capabilityVersion!=='1.0.0'||r.operation!=='light.set_level'||!keys(r.parameters,'level')||!Number.isFinite(r.parameters.level)||r.parameters.level<0||r.parameters.level>1||actionFingerprint(r)!==approval.actionFingerprint||
+      !keys(g,'assistantRef,audienceRef,endpointRef,participantRefs,worldRef')||!text(g.worldRef)||![g.assistantRef,g.endpointRef,g.audienceRef].every(value=>value===null||text(value))||!Array.isArray(g.participantRefs)||g.participantRefs.length>32||!g.participantRefs.every(value=>text(value))||new Set(g.participantRefs).size!==g.participantRefs.length||
+      !keys(snapshot,'expiresAt,sha256,snapshotJson,snapshotRef')||!text(snapshot.snapshotRef)||!time(snapshot.expiresAt)||Buffer.byteLength(snapshot.snapshotJson)>32768||source?.snapshot?.snapshotRef!==snapshot.snapshotRef||source.snapshot.principalRef!==approval.principalRef||source.snapshot.expiresAt!==snapshot.expiresAt||!Array.isArray(source.scope)||source.scope.length!==11||source.scope[1]!==approval.principalRef||!Array.isArray(source.scope[4])||!source.scope[4].includes(approval.siteRef)||!isDeepStrictEqual(source.scope.slice(5),[g.assistantRef,g.endpointRef,g.participantRefs,g.audienceRef,g.worldRef,r.executionEnvironmentRef])||Date.parse(approval.expiresAt)>Date.parse(snapshot.expiresAt)||
+      (approval.status!=='approved'&&(approval.approvedBy!==null||approval.approvedAt!==null||approval.humanProof!=null))||(approval.status==='approved'&&(!text(approval.approvedBy)||!keys(approval.humanProof,'authenticatedAt,authenticationMethod,principalRef,verifiedAt'))))throw failure('approval_evidence_corrupt');
+    const evidence={schemaVersion:'1.0.0',kind:'pwce.action.approval',approvalRef:approval.approvalRef,requestKey:approval.requestKey,requestFingerprint:approval.actionFingerprint,principalRef:approval.principalRef,siteRef:approval.siteRef,capabilityRef:approval.capabilityRef,status:approval.status,createdAt:approval.createdAt,expiresAt:approval.expiresAt,approvedBy:approval.approvedBy,approvedAt:approval.approvedAt,humanProof:approval.humanProof??null,review:approval.gatewayReview,snapshot:approval.gatewaySnapshot,confirmationDigest:approval.confirmationDigest};
+    assertCurrent();return structuredClone(evidence);
   }
 
   async approve({ approvalRef, approvedBy, confirmationDigest, humanProof, assertCurrent = () => {} }) {
